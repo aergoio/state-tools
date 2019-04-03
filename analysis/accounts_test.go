@@ -32,7 +32,7 @@ func Test2AccountsAnalysis(t *testing.T) {
 	if aa.NbUserAccounts != 2 {
 		t.Fatal("Expected to find 2 accounts in the trie")
 	}
-	if aa.Trie.LoadDbCounter != 66 {
+	if aa.Trie.counterOn && aa.Trie.LoadDbCounter != 66 {
 		// the nodes are at the tip, so 64 + 2 = 66
 		t.Fatal("Expected 66 disk reads, got :", aa.Trie.LoadDbCounter)
 	}

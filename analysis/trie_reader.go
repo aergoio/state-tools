@@ -32,7 +32,7 @@ type TrieReader struct {
 func NewTrieReader(store db.DB) *TrieReader {
 	s := &TrieReader{
 		TrieHeight:    256, // hash any string to get output length
-		counterOn:     true,
+		counterOn:     false,
 		db:            store,
 		LoadDbCounter: 0,
 	}
@@ -78,9 +78,9 @@ func (s *TrieReader) loadBatch(root []byte) ([][]byte, error) {
 		s.LoadDbCounter++
 		s.loadDbMux.Unlock()
 	}
-	s.dbLock.Lock()
+	// s.dbLock.Lock()
 	dbval := s.db.Get(root[:HashLength])
-	s.dbLock.Unlock()
+	// s.dbLock.Unlock()
 	nodeSize := len(dbval)
 	if nodeSize != 0 {
 		return s.parseBatch(dbval), nil
