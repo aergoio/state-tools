@@ -13,6 +13,7 @@ const (
 )
 
 // TrieReader provides tools for parsing trie nodes in a db
+// It is a striped down version of the aergo trie package
 type TrieReader struct {
 	db db.DB
 	// dbLock is a lock for db access
