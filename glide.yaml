@@ -1,0 +1,8 @@
+package: github.com/aergoio/state-tools
+homepage: https://github.com/aergoio/state-tools
+license: MIT
+import:
+- package: github.com/aergoio/aergo
+  version: ~0.12.2
+- package: github.com/aergoio/aergo-lib
+- package: github.com/minio/sha256-simd
