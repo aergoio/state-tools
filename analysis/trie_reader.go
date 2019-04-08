@@ -30,10 +30,10 @@ type TrieReader struct {
 }
 
 // NewTrieReader creates a new TrieReader
-func NewTrieReader(store db.DB) *TrieReader {
+func NewTrieReader(store db.DB, countDbReads bool) *TrieReader {
 	s := &TrieReader{
 		TrieHeight:    256, // hash any string to get output length
-		counterOn:     false,
+		counterOn:     countDbReads,
 		db:            store,
 		LoadDbCounter: 0,
 	}

@@ -1,9 +1,13 @@
 package analysis
 
 import (
+	"fmt"
+	"math/big"
 	"sync"
 
 	"github.com/aergoio/aergo-lib/db"
+	"github.com/aergoio/aergo/types"
+	"github.com/golang/protobuf/proto"
 )
 
 // AccountsAnalysis stores the results of dfs
@@ -11,20 +15,22 @@ type AccountsAnalysis struct {
 	lock            sync.RWMutex
 	NbUserAccounts  uint
 	NbContracts     uint
-	TotalAerBalance []byte
+	NbOtherObjects  uint
+	TotalAerBalance *big.Int
 	Trie            *TrieReader
 	maxThread       uint
 	totalThread     uint
 }
 
 // NewAccountsAnalysis initialises AccountsAnalysis
-func NewAccountsAnalysis(store db.DB) *AccountsAnalysis {
+func NewAccountsAnalysis(store db.DB, countDbReads bool) *AccountsAnalysis {
 	return &AccountsAnalysis{
-		NbUserAccounts: 0,
-		NbContracts:    0,
-		//TotalAerBalance: 0,
-		Trie:      NewTrieReader(store),
-		maxThread: 10000,
+		NbUserAccounts:  0,
+		NbContracts:     0,
+		NbOtherObjects:  0,
+		TotalAerBalance: new(big.Int),
+		Trie:            NewTrieReader(store, countDbReads),
+		maxThread:       10000,
 	}
 }
 
@@ -44,10 +50,32 @@ func (aa *AccountsAnalysis) dfs(root []byte, iBatch, height int, batch [][]byte,
 		return
 	}
 	if isShortcut {
+		raw := aa.Trie.db.Get(rnode[:HashLength])
+		if len(raw) == 0 {
+			ch <- fmt.Errorf("Error: a leaf doesnt contain any data, shouldn't exist")
+			return
+		}
+		data := &types.State{}
+		err = proto.Unmarshal(raw, data)
+		if err != nil {
+			ch <- err
+			return
+		}
 		aa.lock.Lock()
-		aa.NbUserAccounts++
+		if data.GetCodeHash() != nil {
+			aa.NbContracts++
+		} else if data.GetBalance() != nil {
+			aa.NbUserAccounts++
+		} else {
+			// not a State object
+			aa.NbOtherObjects++
+			aa.lock.Unlock()
+			ch <- nil
+			return
+		}
+		aa.TotalAerBalance = new(big.Int).Add(aa.TotalAerBalance,
+			new(big.Int).SetBytes(data.GetBalance()))
 		aa.lock.Unlock()
-		// TODO load account in db and get balance
 		ch <- nil
 		return
 	}
