@@ -50,7 +50,7 @@ func main() {
 	if counterOn {
 		fmt.Println("Number of DB reads performed to iterate Trie: ", aa.Trie.LoadDbCounter)
 	}
-	fmt.Println("Total Balance of all pubKeys and contracts: ", aa.TotalAerBalance)
+	fmt.Println("Total Aer Balance of all pubKeys and contracts: ", aa.TotalAerBalance)
 
 	store.Close()
 }
