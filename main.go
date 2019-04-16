@@ -44,7 +44,7 @@ func main() {
 	fmt.Println("\nAnalysis results:")
 	fmt.Println("=================")
 	fmt.Println("Number of contracts: ", aa.NbContracts)
-	fmt.Println("Number of pubKey accounts: ", aa.NbUserAccounts)
+	fmt.Println("Number of pubKey accounts + 1 (staking contract): ", aa.NbUserAccounts)
 	fmt.Println("Total number of accounts (pubkey + contract): ", aa.NbUserAccounts+aa.NbContracts)
 	fmt.Println("Number of other objects stored in trie: ", aa.NbOtherObjects)
 	if counterOn {

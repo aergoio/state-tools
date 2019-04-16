@@ -1,9 +1,10 @@
-hash: 73b2ea53c230741ded03fa592185c0c87f47744c4177e5b456040c4365f14dff
-updated: 2019-04-08T15:53:17.31829+09:00
+hash: 57b698e1e6d54c33b75cc04893b2bc261d010ebb05ec1c9b6cd5beefcfa375dc
+updated: 2019-04-16T14:30:08.964867+09:00
 imports:
 - name: github.com/aergoio/aergo
-  version: 2df182d63a96a20e8022d6e8a3b36641b7b28448
+  version: 54e741f6362e3ec1b9a7fe99d1c838f0756d7b84
   subpackages:
+  - fee
   - internal/common
   - internal/enc
   - internal/merkle
