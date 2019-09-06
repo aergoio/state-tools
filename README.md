@@ -7,7 +7,6 @@ This tool iterates all the leaves in a state Trie (of given root) stored in the 
 
 
 ```sh
-$ glide install
 $ cd $GOPATH/src/github.com/aergoio/state-tools
 $ go install
 ```
