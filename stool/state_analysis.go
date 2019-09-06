@@ -11,30 +11,40 @@ import (
 
 // StateAnalysis stores the results of dfs
 type StateAnalysis struct {
-	lock            sync.RWMutex
+	lock          sync.RWMutex
+	Counters      *Counters
+	Trie          *TrieReader
+	snapshot      bool
+	maxThread     uint
+	totalThread   uint
+	parseAccounts bool
+}
+
+// Counters groups counters together
+type Counters struct {
 	NbUserAccounts  uint
 	NbUserAccounts0 uint
 	NbContracts     uint
 	NbNilObjects    uint
 	TotalAerBalance *big.Int
-	Trie            *TrieReader
-	Snapshot        bool
-	maxThread       uint
-	totalThread     uint
 }
 
 // NewStateAnalysis initialises StateAnalysis
-func NewStateAnalysis(store db.DB, countDbReads, snapshot bool) *StateAnalysis {
-	return &StateAnalysis{
+func NewStateAnalysis(store db.DB, countDbReads, snapshot, parseAccounts bool, maxThread uint) *StateAnalysis {
+	c := &Counters{
 		NbUserAccounts:  0,
 		NbUserAccounts0: 0,
 		NbContracts:     0,
 		NbNilObjects:    0,
-		TotalAerBalance: new(big.Int),
-		Trie:            NewTrieReader(store, countDbReads),
-		Snapshot:        snapshot,
-		maxThread:       10000,
-		totalThread:     0,
+		TotalAerBalance: new(big.Int).SetUint64(0),
+	}
+	return &StateAnalysis{
+		Counters:      c,
+		Trie:          NewTrieReader(store, countDbReads, snapshot),
+		snapshot:      snapshot,
+		maxThread:     maxThread,
+		totalThread:   0,
+		parseAccounts: parseAccounts,
 	}
 }
 
@@ -55,36 +65,23 @@ func (sa *StateAnalysis) dfs(root []byte, iBatch, height int, batch [][]byte, ch
 	}
 	if isShortcut {
 		raw := sa.Trie.db.Get(rnode[:HashLength])
-		// TODO copy to new db
-		if len(raw) == 0 {
-			// transaction with amount 0 to a new address creates a balance 0 and nonce 0 account
-			sa.lock.Lock()
-			sa.NbNilObjects++
-			sa.lock.Unlock()
+
+		if sa.snapshot {
+			// TODO store in snapshot
+		}
+
+		if sa.parseAccounts {
+			storageRoot, err := sa.parseAccount(raw)
+			if err != nil {
+				ch <- err
+				return
+			}
+			if storageRoot != nil {
+				// TODO analyse storage tree (storageRoot)
+			}
 			ch <- nil
 			return
 		}
-		data := &types.State{}
-		err = proto.Unmarshal(raw, data)
-		if err != nil {
-			ch <- err
-			return
-		}
-		sa.lock.Lock()
-		storageRoot := data.GetStorageRoot()
-		if storageRoot != nil {
-			sa.NbContracts++
-		} else if data.GetBalance() != nil {
-			sa.NbUserAccounts++
-		} else {
-			// User account with 0 balance
-			sa.NbUserAccounts0++
-		}
-		sa.TotalAerBalance = new(big.Int).Add(sa.TotalAerBalance,
-			new(big.Int).SetBytes(data.GetBalance()))
-		sa.lock.Unlock()
-		ch <- nil
-		return
 	}
 
 	lch := make(chan error, 1)
@@ -126,4 +123,33 @@ func (sa *StateAnalysis) dfs(root []byte, iBatch, height int, batch [][]byte, ch
 		}
 	}
 	ch <- nil
+}
+
+func (sa *StateAnalysis) parseAccount(raw []byte) ([]byte, error) {
+	if len(raw) == 0 {
+		// transaction with amount 0 to a new address creates a balance 0 and nonce 0 account
+		sa.lock.Lock()
+		sa.Counters.NbNilObjects++
+		sa.lock.Unlock()
+		return nil, nil
+	}
+	data := &types.State{}
+	err := proto.Unmarshal(raw, data)
+	if err != nil {
+		return nil, err
+	}
+	sa.lock.Lock()
+	storageRoot := data.GetStorageRoot()
+	if storageRoot != nil {
+		sa.Counters.NbContracts++
+	} else if data.GetBalance() != nil {
+		sa.Counters.NbUserAccounts++
+	} else {
+		// User account with 0 balance
+		sa.Counters.NbUserAccounts0++
+	}
+	sa.Counters.TotalAerBalance = new(big.Int).Add(sa.Counters.TotalAerBalance,
+		new(big.Int).SetBytes(data.GetBalance()))
+	sa.lock.Unlock()
+	return storageRoot, nil
 }

@@ -48,23 +48,23 @@ func main() {
 		_ = os.MkdirAll(dbPath, 0711)
 	}
 	store := db.NewDB(db.BadgerImpl, dbPath)
-	aa := stool.NewStateAnalysis(store, counterOn, snapshot)
-	err := aa.Dfs(rootBytes, 0, 256, nil)
+	sa := stool.NewStateAnalysis(store, counterOn, snapshot, true, 10000)
+	err := sa.Dfs(rootBytes, 0, 256, nil)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	fmt.Println("\nAnalysis results:")
 	fmt.Println("=================")
-	fmt.Println("Number of contracts: ", aa.NbContracts)
-	fmt.Println("Number of pubKey accounts + 1 (staking contract): ", aa.NbUserAccounts)
-	fmt.Println("Number of 0 balance pubkeys: ", aa.NbUserAccounts0)
-	fmt.Println("Total number of accounts (pubkey + contract): ", aa.NbUserAccounts0+aa.NbUserAccounts+aa.NbContracts)
-	fmt.Println("Number of nil (0 nonce, 0 balance) objects: ", aa.NbNilObjects)
+	fmt.Println("Number of contracts: ", sa.Counters.NbContracts)
+	fmt.Println("Number of pubKey accounts + 1 (staking contract): ", sa.Counters.NbUserAccounts)
+	fmt.Println("Number of 0 balance pubkeys: ", sa.Counters.NbUserAccounts0)
+	fmt.Println("Total number of accounts (pubkey + contract): ", sa.Counters.NbUserAccounts0+sa.Counters.NbUserAccounts+sa.Counters.NbContracts)
+	fmt.Println("Number of nil (0 nonce, 0 balance) objects: ", sa.Counters.NbNilObjects)
 	if counterOn {
-		fmt.Println("Number of DB reads performed to iterate Trie: ", aa.Trie.LoadDbCounter)
+		fmt.Println("Number of DB reads performed to iterate Trie: ", sa.Trie.LoadDbCounter)
 	}
-	fmt.Println("Total Aer Balance of all pubKeys and contracts: ", aa.TotalAerBalance)
+	fmt.Println("Total Aer Balance of all pubKeys and contracts: ", sa.Counters.TotalAerBalance)
 
 	store.Close()
 }

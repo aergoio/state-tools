@@ -26,16 +26,18 @@ type TrieReader struct {
 	loadDbMux sync.RWMutex
 	// counterOn is used to enable/diseable for efficiency
 	counterOn bool
-	// CacheHeightLimit is the number of tree levels we want to store in cache
+	// snapshot is used to copy nodes to the snapshot db
+	snapshot bool
 }
 
 // NewTrieReader creates a new TrieReader
-func NewTrieReader(store db.DB, countDbReads bool) *TrieReader {
+func NewTrieReader(store db.DB, countDbReads, snapshot bool) *TrieReader {
 	s := &TrieReader{
 		TrieHeight:    256, // hash any string to get output length
 		counterOn:     countDbReads,
 		db:            store,
 		LoadDbCounter: 0,
+		snapshot:      snapshot,
 	}
 	return s
 }
@@ -82,8 +84,12 @@ func (s *TrieReader) loadBatch(root []byte) ([][]byte, error) {
 	}
 	// s.dbLock.Lock()
 	dbval := s.db.Get(root[:HashLength])
-	// TODO copy to new db
 	// s.dbLock.Unlock()
+
+	if s.snapshot {
+		// TODO store in snapshot
+	}
+
 	nodeSize := len(dbval)
 	if nodeSize != 0 {
 		return s.parseBatch(dbval), nil
