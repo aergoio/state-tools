@@ -1,4 +1,4 @@
-package analysis
+package stool
 
 import (
 	"math/big"
@@ -9,8 +9,8 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-// AccountsAnalysis stores the results of dfs
-type AccountsAnalysis struct {
+// StateAnalysis stores the results of dfs
+type StateAnalysis struct {
 	lock            sync.RWMutex
 	NbUserAccounts  uint
 	NbUserAccounts0 uint
@@ -23,9 +23,9 @@ type AccountsAnalysis struct {
 	totalThread     uint
 }
 
-// NewAccountsAnalysis initialises AccountsAnalysis
-func NewAccountsAnalysis(store db.DB, countDbReads, snapshot bool) *AccountsAnalysis {
-	return &AccountsAnalysis{
+// NewStateAnalysis initialises StateAnalysis
+func NewStateAnalysis(store db.DB, countDbReads, snapshot bool) *StateAnalysis {
+	return &StateAnalysis{
 		NbUserAccounts:  0,
 		NbUserAccounts0: 0,
 		NbContracts:     0,
@@ -40,26 +40,27 @@ func NewAccountsAnalysis(store db.DB, countDbReads, snapshot bool) *AccountsAnal
 
 // Dfs Depth first search all the trie leaves starting from root
 // For each leaf count it and add it's balance to the total
-func (aa *AccountsAnalysis) Dfs(root []byte, iBatch, height int, batch [][]byte) error {
+func (sa *StateAnalysis) Dfs(root []byte, iBatch, height int, batch [][]byte) error {
 	ch := make(chan error, 1)
-	aa.dfs(root, iBatch, height, batch, ch)
+	sa.dfs(root, iBatch, height, batch, ch)
 	err := <-ch
 	return err
 }
 
-func (aa *AccountsAnalysis) dfs(root []byte, iBatch, height int, batch [][]byte, ch chan<- (error)) {
-	batch, iBatch, lnode, rnode, isShortcut, err := aa.Trie.LoadChildren(root, height, iBatch, batch)
+func (sa *StateAnalysis) dfs(root []byte, iBatch, height int, batch [][]byte, ch chan<- (error)) {
+	batch, iBatch, lnode, rnode, isShortcut, err := sa.Trie.LoadChildren(root, height, iBatch, batch)
 	if err != nil {
 		ch <- err
 		return
 	}
 	if isShortcut {
-		raw := aa.Trie.db.Get(rnode[:HashLength])
+		raw := sa.Trie.db.Get(rnode[:HashLength])
+		// TODO copy to new db
 		if len(raw) == 0 {
 			// transaction with amount 0 to a new address creates a balance 0 and nonce 0 account
-			aa.lock.Lock()
-			aa.NbNilObjects++
-			aa.lock.Unlock()
+			sa.lock.Lock()
+			sa.NbNilObjects++
+			sa.lock.Unlock()
 			ch <- nil
 			return
 		}
@@ -69,18 +70,19 @@ func (aa *AccountsAnalysis) dfs(root []byte, iBatch, height int, batch [][]byte,
 			ch <- err
 			return
 		}
-		aa.lock.Lock()
-		if data.GetStorageRoot() != nil {
-			aa.NbContracts++
+		sa.lock.Lock()
+		storageRoot := data.GetStorageRoot()
+		if storageRoot != nil {
+			sa.NbContracts++
 		} else if data.GetBalance() != nil {
-			aa.NbUserAccounts++
+			sa.NbUserAccounts++
 		} else {
 			// User account with 0 balance
-			aa.NbUserAccounts0++
+			sa.NbUserAccounts0++
 		}
-		aa.TotalAerBalance = new(big.Int).Add(aa.TotalAerBalance,
+		sa.TotalAerBalance = new(big.Int).Add(sa.TotalAerBalance,
 			new(big.Int).SetBytes(data.GetBalance()))
-		aa.lock.Unlock()
+		sa.lock.Unlock()
 		ch <- nil
 		return
 	}
@@ -88,15 +90,15 @@ func (aa *AccountsAnalysis) dfs(root []byte, iBatch, height int, batch [][]byte,
 	lch := make(chan error, 1)
 	rch := make(chan error, 1)
 	if lnode != nil && rnode != nil {
-		if aa.totalThread < aa.maxThread {
-			go aa.dfs(lnode, 2*iBatch+1, height-1, batch, lch)
-			go aa.dfs(rnode, 2*iBatch+2, height-1, batch, rch)
-			aa.lock.Lock()
-			aa.totalThread += 2
-			aa.lock.Unlock()
+		if sa.totalThread < sa.maxThread {
+			go sa.dfs(lnode, 2*iBatch+1, height-1, batch, lch)
+			go sa.dfs(rnode, 2*iBatch+2, height-1, batch, rch)
+			sa.lock.Lock()
+			sa.totalThread += 2
+			sa.lock.Unlock()
 		} else {
-			aa.dfs(lnode, 2*iBatch+1, height-1, batch, lch)
-			aa.dfs(rnode, 2*iBatch+2, height-1, batch, rch)
+			sa.dfs(lnode, 2*iBatch+1, height-1, batch, lch)
+			sa.dfs(rnode, 2*iBatch+2, height-1, batch, rch)
 		}
 		lresult := <-lch
 		if lresult != nil {
@@ -109,14 +111,14 @@ func (aa *AccountsAnalysis) dfs(root []byte, iBatch, height int, batch [][]byte,
 			return
 		}
 	} else if lnode != nil {
-		aa.dfs(lnode, 2*iBatch+1, height-1, batch, lch)
+		sa.dfs(lnode, 2*iBatch+1, height-1, batch, lch)
 		lresult := <-lch
 		if lresult != nil {
 			ch <- lresult
 			return
 		}
 	} else if rnode != nil {
-		aa.dfs(rnode, 2*iBatch+2, height-1, batch, rch)
+		sa.dfs(rnode, 2*iBatch+2, height-1, batch, rch)
 		rresult := <-rch
 		if rresult != nil {
 			ch <- rresult

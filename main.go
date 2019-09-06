@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/aergoio/aergo-lib/db"
-	"github.com/aergoio/state-tools/analysis"
+	"github.com/aergoio/state-tools/stool"
 	"github.com/mr-tron/base58/base58"
 )
 
@@ -48,7 +48,7 @@ func main() {
 		_ = os.MkdirAll(dbPath, 0711)
 	}
 	store := db.NewDB(db.BadgerImpl, dbPath)
-	aa := analysis.NewAccountsAnalysis(store, counterOn, snapshot)
+	aa := stool.NewStateAnalysis(store, counterOn, snapshot)
 	err := aa.Dfs(rootBytes, 0, 256, nil)
 	if err != nil {
 		fmt.Println(err)

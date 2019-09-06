@@ -1,4 +1,4 @@
-package analysis
+package stool
 
 import (
 	"fmt"
@@ -82,6 +82,7 @@ func (s *TrieReader) loadBatch(root []byte) ([][]byte, error) {
 	}
 	// s.dbLock.Lock()
 	dbval := s.db.Get(root[:HashLength])
+	// TODO copy to new db
 	// s.dbLock.Unlock()
 	nodeSize := len(dbval)
 	if nodeSize != 0 {

@@ -1,4 +1,4 @@
-package analysis
+package stool
 
 import (
 	"bytes"
@@ -57,26 +57,26 @@ func Test2AccountsAnalysis(t *testing.T) {
 	txn.(db.Transaction).Commit()
 
 	// Analyse state
-	aa := NewAccountsAnalysis(store, true, false)
-	err := aa.Dfs(smt.Root, 0, 256, nil)
+	sa := NewStateAnalysis(store, true, false)
+	err := sa.Dfs(smt.Root, 0, 256, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Test results
-	if aa.NbUserAccounts != 1 {
-		t.Fatal("Expected to find 1 user account in the trie, found: ", aa.NbUserAccounts)
+	if sa.NbUserAccounts != 1 {
+		t.Fatal("Expected to find 1 user account in the trie, found: ", sa.NbUserAccounts)
 	}
-	if aa.NbContracts != 1 {
-		t.Fatal("Expected to find 1 contract in the trie, found: ", aa.NbContracts)
+	if sa.NbContracts != 1 {
+		t.Fatal("Expected to find 1 contract in the trie, found: ", sa.NbContracts)
 	}
-	if aa.Trie.LoadDbCounter != 66 {
+	if sa.Trie.LoadDbCounter != 66 {
 		// the nodes are at the tip, so 64 + 2 = 66
-		t.Fatal("Expected 66 disk reads, got :", aa.Trie.LoadDbCounter)
+		t.Fatal("Expected 66 disk reads, got :", sa.Trie.LoadDbCounter)
 	}
 	expectedBalance, _ := new(big.Int).SetString("36893488147419103232", 10)
-	if aa.TotalAerBalance.Cmp(expectedBalance) != 0 {
-		t.Fatal("Expected 36893488147419103232 total balance, got :", aa.TotalAerBalance)
+	if sa.TotalAerBalance.Cmp(expectedBalance) != 0 {
+		t.Fatal("Expected 36893488147419103232 total balance, got :", sa.TotalAerBalance)
 	}
 	store.Close()
 	os.RemoveAll(".aergo")
@@ -102,22 +102,22 @@ func TestAccountsAnalysisFullLoad(t *testing.T) {
 	loadTrieAccounts(smt, store, totalAccounts, raw1)
 	fmt.Println(smt.Root)
 
-	aa := NewAccountsAnalysis(store, false, false)
+	sa := NewStateAnalysis(store, false, false)
 	start := time.Now()
-	err := aa.Dfs(smt.Root, 0, 256, nil)
+	err := sa.Dfs(smt.Root, 0, 256, nil)
 	fmt.Println("Analysis time: ", time.Now().Sub(start))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if aa.NbUserAccounts != totalAccounts {
-		t.Fatal("Expected to find 100K accounts in the trie, got", aa.NbUserAccounts)
+	if sa.NbUserAccounts != totalAccounts {
+		t.Fatal("Expected to find 100K accounts in the trie, got", sa.NbUserAccounts)
 	}
-	if aa.NbContracts != totalAccounts {
-		t.Fatal("Expected to find 100K contracts in the trie, got", aa.NbContracts)
+	if sa.NbContracts != totalAccounts {
+		t.Fatal("Expected to find 100K contracts in the trie, got", sa.NbContracts)
 	}
 	expectedBalance := new(big.Int).Mul(balance, new(big.Int).SetUint64(uint64(totalAccounts*2)))
-	if aa.TotalAerBalance.Cmp(expectedBalance) != 0 {
-		t.Fatal("Expected 18446744073709551616 * 200K total balance, got :", aa.TotalAerBalance)
+	if sa.TotalAerBalance.Cmp(expectedBalance) != 0 {
+		t.Fatal("Expected 18446744073709551616 * 200K total balance, got :", sa.TotalAerBalance)
 	}
 	store.Close()
 	os.RemoveAll(".aergo")
