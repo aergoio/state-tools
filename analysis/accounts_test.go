@@ -39,8 +39,8 @@ func Test2AccountsAnalysis(t *testing.T) {
 	txn := store.NewTx()
 	balance, _ := new(big.Int).SetString("18446744073709551616", 10)
 	accountData0 := types.State{
-		Balance:  balance.Bytes(),
-		CodeHash: []byte("code hash"),
+		Balance:     balance.Bytes(),
+		StorageRoot: []byte("storage root"),
 	}
 	accountData1 := types.State{
 		Balance: balance.Bytes(),
@@ -65,10 +65,10 @@ func Test2AccountsAnalysis(t *testing.T) {
 
 	// Test results
 	if aa.NbUserAccounts != 1 {
-		t.Fatal("Expected to find 1 user account in the trie")
+		t.Fatal("Expected to find 1 user account in the trie, found: ", aa.NbUserAccounts)
 	}
 	if aa.NbContracts != 1 {
-		t.Fatal("Expected to find 1 contract in the trie")
+		t.Fatal("Expected to find 1 contract in the trie, found: ", aa.NbContracts)
 	}
 	if aa.Trie.counterOn && aa.Trie.LoadDbCounter != 66 {
 		// the nodes are at the tip, so 64 + 2 = 66
@@ -89,8 +89,8 @@ func TestAccountsAnalysisFullLoad(t *testing.T) {
 	smt := trie.NewTrie(nil, Hasher, store)
 	balance, _ := new(big.Int).SetString("18446744073709551616", 10)
 	accountData0 := types.State{
-		Balance:  balance.Bytes(),
-		CodeHash: []byte("code hash"),
+		Balance:     balance.Bytes(),
+		StorageRoot: []byte("storage root"),
 	}
 	accountData1 := types.State{
 		Balance: balance.Bytes(),
@@ -114,9 +114,6 @@ func TestAccountsAnalysisFullLoad(t *testing.T) {
 	}
 	if aa.NbContracts != totalAccounts {
 		t.Fatal("Expected to find 100K contracts in the trie, got", aa.NbContracts)
-	}
-	if aa.NbOtherObjects != 0 {
-		t.Fatal("Expected to find 0 other objects in the trie, got", aa.NbOtherObjects)
 	}
 	expectedBalance := new(big.Int).Mul(balance, new(big.Int).SetUint64(uint64(totalAccounts*2)))
 	if aa.TotalAerBalance.Cmp(expectedBalance) != 0 {

@@ -1,7 +1,6 @@
 package analysis
 
 import (
-	"fmt"
 	"math/big"
 	"sync"
 
@@ -14,8 +13,9 @@ import (
 type AccountsAnalysis struct {
 	lock            sync.RWMutex
 	NbUserAccounts  uint
+	NbUserAccounts0 uint
 	NbContracts     uint
-	NbOtherObjects  uint
+	NbNilObjects    uint
 	TotalAerBalance *big.Int
 	Trie            *TrieReader
 	maxThread       uint
@@ -26,8 +26,9 @@ type AccountsAnalysis struct {
 func NewAccountsAnalysis(store db.DB, countDbReads bool) *AccountsAnalysis {
 	return &AccountsAnalysis{
 		NbUserAccounts:  0,
+		NbUserAccounts0: 0,
 		NbContracts:     0,
-		NbOtherObjects:  0,
+		NbNilObjects:    0,
 		TotalAerBalance: new(big.Int),
 		Trie:            NewTrieReader(store, countDbReads),
 		maxThread:       10000,
@@ -52,7 +53,11 @@ func (aa *AccountsAnalysis) dfs(root []byte, iBatch, height int, batch [][]byte,
 	if isShortcut {
 		raw := aa.Trie.db.Get(rnode[:HashLength])
 		if len(raw) == 0 {
-			ch <- fmt.Errorf("Error: a leaf doesnt contain any data, shouldn't exist")
+			// transaction with amount 0 to a new address creates a balance 0 and nonce 0 account
+			aa.lock.Lock()
+			aa.NbNilObjects++
+			aa.lock.Unlock()
+			ch <- nil
 			return
 		}
 		data := &types.State{}
@@ -62,16 +67,13 @@ func (aa *AccountsAnalysis) dfs(root []byte, iBatch, height int, batch [][]byte,
 			return
 		}
 		aa.lock.Lock()
-		if data.GetCodeHash() != nil {
+		if data.GetStorageRoot() != nil {
 			aa.NbContracts++
 		} else if data.GetBalance() != nil {
 			aa.NbUserAccounts++
 		} else {
-			// not a State object
-			aa.NbOtherObjects++
-			aa.lock.Unlock()
-			ch <- nil
-			return
+			// User account with 0 balance
+			aa.NbUserAccounts0++
 		}
 		aa.TotalAerBalance = new(big.Int).Add(aa.TotalAerBalance,
 			new(big.Int).SetBytes(data.GetBalance()))

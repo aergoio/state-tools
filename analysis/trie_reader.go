@@ -47,6 +47,7 @@ func (s *TrieReader) LoadChildren(root []byte, height, iBatch int, batch [][]byt
 	if height%4 == 0 {
 		if len(root) == 0 {
 			// create a new default batch
+			// never called : copy past from aergo trie code
 			batch = make([][]byte, 31, 31)
 			batch[0] = []byte{0}
 		} else {
