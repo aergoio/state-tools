@@ -57,7 +57,7 @@ func Test2AccountsAnalysis(t *testing.T) {
 	txn.(db.Transaction).Commit()
 
 	// Analyse state
-	aa := NewAccountsAnalysis(store, false)
+	aa := NewAccountsAnalysis(store, true, false)
 	err := aa.Dfs(smt.Root, 0, 256, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -70,7 +70,7 @@ func Test2AccountsAnalysis(t *testing.T) {
 	if aa.NbContracts != 1 {
 		t.Fatal("Expected to find 1 contract in the trie, found: ", aa.NbContracts)
 	}
-	if aa.Trie.counterOn && aa.Trie.LoadDbCounter != 66 {
+	if aa.Trie.LoadDbCounter != 66 {
 		// the nodes are at the tip, so 64 + 2 = 66
 		t.Fatal("Expected 66 disk reads, got :", aa.Trie.LoadDbCounter)
 	}
@@ -102,7 +102,7 @@ func TestAccountsAnalysisFullLoad(t *testing.T) {
 	loadTrieAccounts(smt, store, totalAccounts, raw1)
 	fmt.Println(smt.Root)
 
-	aa := NewAccountsAnalysis(store, false)
+	aa := NewAccountsAnalysis(store, false, false)
 	start := time.Now()
 	err := aa.Dfs(smt.Root, 0, 256, nil)
 	fmt.Println("Analysis time: ", time.Now().Sub(start))
@@ -119,7 +119,6 @@ func TestAccountsAnalysisFullLoad(t *testing.T) {
 	if aa.TotalAerBalance.Cmp(expectedBalance) != 0 {
 		t.Fatal("Expected 18446744073709551616 * 200K total balance, got :", aa.TotalAerBalance)
 	}
-	fmt.Println(aa.Trie.LoadDbCounter)
 	store.Close()
 	os.RemoveAll(".aergo")
 }

@@ -18,12 +18,13 @@ type AccountsAnalysis struct {
 	NbNilObjects    uint
 	TotalAerBalance *big.Int
 	Trie            *TrieReader
+	Snapshot        bool
 	maxThread       uint
 	totalThread     uint
 }
 
 // NewAccountsAnalysis initialises AccountsAnalysis
-func NewAccountsAnalysis(store db.DB, countDbReads bool) *AccountsAnalysis {
+func NewAccountsAnalysis(store db.DB, countDbReads, snapshot bool) *AccountsAnalysis {
 	return &AccountsAnalysis{
 		NbUserAccounts:  0,
 		NbUserAccounts0: 0,
@@ -31,7 +32,9 @@ func NewAccountsAnalysis(store db.DB, countDbReads bool) *AccountsAnalysis {
 		NbNilObjects:    0,
 		TotalAerBalance: new(big.Int),
 		Trie:            NewTrieReader(store, countDbReads),
+		Snapshot:        snapshot,
 		maxThread:       10000,
+		totalThread:     0,
 	}
 }
 
