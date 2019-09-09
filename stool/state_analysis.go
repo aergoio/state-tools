@@ -9,7 +9,14 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
+// Hash type of snapshotNodes map keys
 type Hash [32]byte
+
+// DbTx represents Set and Delete interface to store data
+type DbTx interface {
+	Set(key, value []byte)
+	Delete(key []byte)
+}
 
 // StateAnalysis stores the results of dfs
 type StateAnalysis struct {
@@ -81,10 +88,8 @@ func (sa *StateAnalysis) Snapshot(snapStore db.DB, root []byte) error {
 	if err != nil {
 		return err
 	}
-	sa.snapStoreLock.Lock()
-	// TODO commit to db
-	// sa.snapshotNodes and s.Trie.snapshotNodes
-	sa.snapStoreLock.Unlock()
+	sa.commitSnapshotNodes(sa.snapshotNodes)
+	sa.commitSnapshotNodes(sa.Trie.snapshotNodes)
 	return nil
 }
 
@@ -225,9 +230,18 @@ func (sa *StateAnalysis) snapshotContractState(storageRoot []byte) error {
 	if err != nil {
 		return err
 	}
-	sa.snapStoreLock.Lock()
-	// TODO commit to db
-	// storageAnalysis.snapshotNodes and storageAnalysis.Trie.snapshotNodes
-	sa.snapStoreLock.Unlock()
+	sa.commitSnapshotNodes(storageAnalysis.snapshotNodes)
+	sa.commitSnapshotNodes(storageAnalysis.Trie.snapshotNodes)
 	return nil
+}
+
+func (sa *StateAnalysis) commitSnapshotNodes(snapshotNodes map[Hash][]byte) {
+	sa.snapStoreLock.Lock()
+	txn := sa.snapStore.NewTx().(DbTx)
+	for key, value := range snapshotNodes {
+		var node []byte
+		txn.Set(append(node, key[:]...), value)
+	}
+	txn.(db.Transaction).Commit()
+	sa.snapStoreLock.Unlock()
 }
