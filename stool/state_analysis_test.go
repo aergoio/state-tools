@@ -57,8 +57,8 @@ func Test2AccountsAnalysis(t *testing.T) {
 	txn.(db.Transaction).Commit()
 
 	// Analyse state
-	sa := NewStateAnalysis(store, true, false, true, 10000)
-	err := sa.Dfs(smt.Root, 0, 256, nil)
+	sa := NewStateAnalysis(store, true, true, 10000)
+	err := sa.Analyse(smt.Root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,9 +102,9 @@ func TestAccountsAnalysisFullLoad(t *testing.T) {
 	loadTrieAccounts(smt, store, totalAccounts, raw1)
 	fmt.Println(smt.Root)
 
-	sa := NewStateAnalysis(store, false, false, true, 10000)
+	sa := NewStateAnalysis(store, false, true, 10000)
 	start := time.Now()
-	err := sa.Dfs(smt.Root, 0, 256, nil)
+	err := sa.Analyse(smt.Root)
 	fmt.Println("Analysis time: ", time.Now().Sub(start))
 	if err != nil {
 		t.Fatal(err)

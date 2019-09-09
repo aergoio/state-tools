@@ -19,8 +19,8 @@ func main() {
 	var countDbReads string
 	var createSnapshot string
 	var dbSnapshotPath string
+	var snapStore db.DB
 	counterOn := false
-	snapshot := false
 
 	fmt.Printf("\nPath/to/aergo/database/data/state:\n> ")
 	fmt.Scanln(&dbPath)
@@ -31,30 +31,37 @@ func main() {
 	if countDbReads == "y" || countDbReads == "yes" || countDbReads == "Y" || countDbReads == "Yes" {
 		counterOn = true
 	}
+	rootBytes, _ := base58.Decode(stateRoot)
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		_ = os.MkdirAll(dbPath, 0711)
+	}
+	store := db.NewDB(db.BadgerImpl, dbPath)
+	sa := stool.NewStateAnalysis(store, counterOn, true, 10000)
 
 	fmt.Printf("\nAlso snapshot the state? This will copy all the data recorded under TrieRoot (y/n):\n> ")
 	fmt.Scanln(&createSnapshot)
 	if createSnapshot == "y" || createSnapshot == "yes" || createSnapshot == "Y" || createSnapshot == "Yes" {
 		fmt.Printf("\nSnapshot/path/to/aergo/database/data/state:\n> ")
 		fmt.Scanln(&dbSnapshotPath)
-		snapshot = true
+
+		// create snapshot
+		snapStore = db.NewDB(db.BadgerImpl, dbSnapshotPath)
+		err := sa.Snapshot(snapStore, rootBytes)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+	} else {
+
+		// Just iterate storage
+		err := sa.Analyse(rootBytes)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
 	}
 
-	// dbPath := "/Users/pa/Go_workspace/src/github.com/aergoio/aergo/.aergo/data/state"
-	// stateRoot := "66QMsEUpLc7zx2D4jkYMN5UbGefmdFFHePnXrZitKJc2"
-
-	rootBytes, _ := base58.Decode(stateRoot)
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		_ = os.MkdirAll(dbPath, 0711)
-	}
-	store := db.NewDB(db.BadgerImpl, dbPath)
-	sa := stool.NewStateAnalysis(store, counterOn, snapshot, true, 10000)
-	err := sa.Dfs(rootBytes, 0, 256, nil)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println("\nAnalysis results:")
+	fmt.Println("\nGeneral trie analysis results:")
 	fmt.Println("=================")
 	fmt.Println("Number of contracts: ", sa.Counters.NbContracts)
 	fmt.Println("Number of pubKey accounts + 1 (staking contract): ", sa.Counters.NbUserAccounts)

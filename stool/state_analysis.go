@@ -9,15 +9,36 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
+type Hash [32]byte
+
 // StateAnalysis stores the results of dfs
 type StateAnalysis struct {
-	lock          sync.RWMutex
-	Counters      *Counters
-	Trie          *TrieReader
-	snapshot      bool
-	maxThread     uint
-	totalThread   uint
-	parseAccounts bool
+	// counterLock for Counters writing
+	counterLock sync.RWMutex
+	// Counters keeps track of the nb of different types of accounts
+	Counters *Counters
+	// Trie contains trie reading functionality
+	Trie *TrieReader
+	// if true copies a snapshot of nodes to a snapshot db
+	snapshot bool
+	// max Threads created while parsing trie
+	maxThread uint
+	// current total nb of threads created
+	totalThread uint
+	// cache shortcut nodes before writing them to snapshot db
+	snapshotNodes map[Hash][]byte
+	// snapshotLock for snapshot nodes caching
+	snapshotLock sync.RWMutex
+	// snapStoreLock for snapshotNodes writing to snapStore
+	snapStoreLock sync.RWMutex
+	// differenciate a general trie analysis from a storage trie analysis
+	generalTrie bool
+	// database to read from
+	store db.DB
+	// database to write snapshot
+	snapStore db.DB
+	// countDbReads
+	countDbReads bool
 }
 
 // Counters groups counters together
@@ -26,33 +47,59 @@ type Counters struct {
 	NbUserAccounts0 uint
 	NbContracts     uint
 	NbNilObjects    uint
+	NbStorageValues uint
 	TotalAerBalance *big.Int
 }
 
 // NewStateAnalysis initialises StateAnalysis
-func NewStateAnalysis(store db.DB, countDbReads, snapshot, parseAccounts bool, maxThread uint) *StateAnalysis {
+func NewStateAnalysis(store db.DB, countDbReads, generalTrie bool, maxThread uint) *StateAnalysis {
 	c := &Counters{
 		NbUserAccounts:  0,
 		NbUserAccounts0: 0,
 		NbContracts:     0,
 		NbNilObjects:    0,
+		NbStorageValues: 0,
 		TotalAerBalance: new(big.Int).SetUint64(0),
 	}
 	return &StateAnalysis{
 		Counters:      c,
-		Trie:          NewTrieReader(store, countDbReads, snapshot),
-		snapshot:      snapshot,
 		maxThread:     maxThread,
 		totalThread:   0,
-		parseAccounts: parseAccounts,
+		snapshotNodes: make(map[Hash][]byte),
+		snapshot:      false,
+		generalTrie:   generalTrie,
+		store:         store,
+		countDbReads:  countDbReads,
 	}
+}
+
+// Snapshot uses Dfs to copy nodes to a new snapshot db
+func (sa *StateAnalysis) Snapshot(snapStore db.DB, root []byte) error {
+	sa.snapStore = snapStore
+	sa.snapshot = true
+	err := sa.Dfs(root)
+	if err != nil {
+		return err
+	}
+	sa.snapStoreLock.Lock()
+	// TODO commit to db
+	// sa.snapshotNodes and s.Trie.snapshotNodes
+	sa.snapStoreLock.Unlock()
+	return nil
+}
+
+// Analyse uses Dfs to analyse and count trie nodes
+func (sa *StateAnalysis) Analyse(root []byte) error {
+	sa.snapshot = false
+	return sa.Dfs(root)
 }
 
 // Dfs Depth first search all the trie leaves starting from root
 // For each leaf count it and add it's balance to the total
-func (sa *StateAnalysis) Dfs(root []byte, iBatch, height int, batch [][]byte) error {
+func (sa *StateAnalysis) Dfs(root []byte) error {
+	sa.Trie = NewTrieReader(sa.store, sa.countDbReads, sa.snapshot)
 	ch := make(chan error, 1)
-	sa.dfs(root, iBatch, height, batch, ch)
+	sa.dfs(root, 0, 256, nil, ch)
 	err := <-ch
 	return err
 }
@@ -65,72 +112,88 @@ func (sa *StateAnalysis) dfs(root []byte, iBatch, height int, batch [][]byte, ch
 	}
 	if isShortcut {
 		raw := sa.Trie.db.Get(rnode[:HashLength])
-
-		if sa.snapshot {
-			// TODO store in snapshot
-		}
-
-		if sa.parseAccounts {
+		if sa.generalTrie {
+			// always parse account in general trie
 			storageRoot, err := sa.parseAccount(raw)
 			if err != nil {
 				ch <- err
 				return
 			}
-			if storageRoot != nil {
-				// TODO analyse storage tree (storageRoot)
+			// if snapshot and is contract account, parse contract storage
+			if sa.snapshot && storageRoot != nil {
+				// snapshot contract storage nodes
+				err := sa.snapshotContractState(storageRoot)
+				if err != nil {
+					ch <- err
+					return
+				}
 			}
-			ch <- nil
-			return
+		} else {
+			// storage values cannot be parsed so just count them
+			sa.counterLock.Lock()
+			sa.Counters.NbStorageValues++
+			sa.counterLock.Unlock()
 		}
+		if sa.snapshot {
+			// snapshot shortcut node
+			// fmt.Println("height: ", height)
+			var dbkey Hash
+			copy(dbkey[:], rnode[:HashLength])
+			sa.snapshotLock.Lock()
+			sa.snapshotNodes[dbkey] = raw
+			sa.snapshotLock.Unlock()
+		}
+		ch <- nil
+		return
 	}
+	err = sa.stepRightLeft(lnode, rnode, iBatch, height, batch)
+	ch <- err
+}
 
+func (sa *StateAnalysis) stepRightLeft(lnode, rnode []byte, iBatch, height int, batch [][]byte) error {
 	lch := make(chan error, 1)
 	rch := make(chan error, 1)
 	if lnode != nil && rnode != nil {
 		if sa.totalThread < sa.maxThread {
 			go sa.dfs(lnode, 2*iBatch+1, height-1, batch, lch)
 			go sa.dfs(rnode, 2*iBatch+2, height-1, batch, rch)
-			sa.lock.Lock()
+			sa.counterLock.Lock()
 			sa.totalThread += 2
-			sa.lock.Unlock()
+			sa.counterLock.Unlock()
 		} else {
 			sa.dfs(lnode, 2*iBatch+1, height-1, batch, lch)
 			sa.dfs(rnode, 2*iBatch+2, height-1, batch, rch)
 		}
 		lresult := <-lch
 		if lresult != nil {
-			ch <- lresult
-			return
+			return lresult
 		}
 		rresult := <-rch
 		if rresult != nil {
-			ch <- rresult
-			return
+			return rresult
 		}
 	} else if lnode != nil {
 		sa.dfs(lnode, 2*iBatch+1, height-1, batch, lch)
 		lresult := <-lch
 		if lresult != nil {
-			ch <- lresult
-			return
+			return lresult
 		}
 	} else if rnode != nil {
 		sa.dfs(rnode, 2*iBatch+2, height-1, batch, rch)
 		rresult := <-rch
 		if rresult != nil {
-			ch <- rresult
-			return
+			return rresult
 		}
 	}
-	ch <- nil
+	return nil
 }
 
 func (sa *StateAnalysis) parseAccount(raw []byte) ([]byte, error) {
 	if len(raw) == 0 {
 		// transaction with amount 0 to a new address creates a balance 0 and nonce 0 account
-		sa.lock.Lock()
+		sa.counterLock.Lock()
 		sa.Counters.NbNilObjects++
-		sa.lock.Unlock()
+		sa.counterLock.Unlock()
 		return nil, nil
 	}
 	data := &types.State{}
@@ -138,7 +201,7 @@ func (sa *StateAnalysis) parseAccount(raw []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	sa.lock.Lock()
+	sa.counterLock.Lock()
 	storageRoot := data.GetStorageRoot()
 	if storageRoot != nil {
 		sa.Counters.NbContracts++
@@ -150,6 +213,21 @@ func (sa *StateAnalysis) parseAccount(raw []byte) ([]byte, error) {
 	}
 	sa.Counters.TotalAerBalance = new(big.Int).Add(sa.Counters.TotalAerBalance,
 		new(big.Int).SetBytes(data.GetBalance()))
-	sa.lock.Unlock()
+	sa.counterLock.Unlock()
 	return storageRoot, nil
+}
+
+func (sa *StateAnalysis) snapshotContractState(storageRoot []byte) error {
+	storageAnalysis := NewStateAnalysis(sa.store, sa.countDbReads, false, 100)
+	storageAnalysis.snapStore = sa.snapStore
+	storageAnalysis.snapshot = true
+	err := storageAnalysis.Dfs(storageRoot)
+	if err != nil {
+		return err
+	}
+	sa.snapStoreLock.Lock()
+	// TODO commit to db
+	// storageAnalysis.snapshotNodes and storageAnalysis.Trie.snapshotNodes
+	sa.snapStoreLock.Unlock()
+	return nil
 }

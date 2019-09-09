@@ -16,8 +16,6 @@ const (
 // It is a striped down version of the aergo trie package
 type TrieReader struct {
 	db db.DB
-	// dbLock is a lock for db access
-	dbLock sync.RWMutex
 	// TrieHeight is the number if bits in a key
 	TrieHeight int
 	// LoadDbCounter counts the nb of db reads in on update
@@ -28,6 +26,10 @@ type TrieReader struct {
 	counterOn bool
 	// snapshot is used to copy nodes to the snapshot db
 	snapshot bool
+	// cache trie nodes before writing them to snapshot db
+	snapshotNodes map[Hash][]byte
+	// snapshotLock for snapshot nodes writing
+	snapshotLock sync.RWMutex
 }
 
 // NewTrieReader creates a new TrieReader
@@ -38,6 +40,7 @@ func NewTrieReader(store db.DB, countDbReads, snapshot bool) *TrieReader {
 		db:            store,
 		LoadDbCounter: 0,
 		snapshot:      snapshot,
+		snapshotNodes: make(map[Hash][]byte),
 	}
 	return s
 }
@@ -82,12 +85,15 @@ func (s *TrieReader) loadBatch(root []byte) ([][]byte, error) {
 		s.LoadDbCounter++
 		s.loadDbMux.Unlock()
 	}
-	// s.dbLock.Lock()
 	dbval := s.db.Get(root[:HashLength])
-	// s.dbLock.Unlock()
 
 	if s.snapshot {
-		// TODO store in snapshot
+		// snapshot shortcut node
+		var dbkey Hash
+		copy(dbkey[:], root[:HashLength])
+		s.snapshotLock.Lock()
+		s.snapshotNodes[dbkey] = dbval
+		s.snapshotLock.Unlock()
 	}
 
 	nodeSize := len(dbval)
