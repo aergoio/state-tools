@@ -1,14 +1,14 @@
 package main
 
 import (
-	"fmt"
-	"os"
-
-	"github.com/aergoio/aergo-lib/db"
-	"github.com/aergoio/state-tools/stool"
-	"github.com/mr-tron/base58/base58"
+	"github.com/aergoio/state-tools/cmd"
 )
 
+func main() {
+	cmd.Execute()
+}
+
+/*
 func main() {
 	fmt.Println("Welcome to the Aergo snapshot and state analysis tool:")
 	fmt.Println("======================================================")
@@ -75,3 +75,4 @@ func main() {
 
 	store.Close()
 }
+*/

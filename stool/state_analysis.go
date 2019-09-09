@@ -223,7 +223,7 @@ func (sa *StateAnalysis) parseAccount(raw []byte) ([]byte, error) {
 }
 
 func (sa *StateAnalysis) snapshotContractState(storageRoot []byte) error {
-	storageAnalysis := NewStateAnalysis(sa.store, sa.countDbReads, false, 100)
+	storageAnalysis := NewStateAnalysis(sa.store, false, false, 100)
 	storageAnalysis.snapStore = sa.snapStore
 	storageAnalysis.snapshot = true
 	err := storageAnalysis.Dfs(storageRoot)

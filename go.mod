@@ -8,4 +8,5 @@ require (
 	github.com/golang/protobuf v1.3.1
 	github.com/minio/sha256-simd v0.1.0
 	github.com/mr-tron/base58 v1.1.2
+	github.com/spf13/cobra v0.0.5
 )
