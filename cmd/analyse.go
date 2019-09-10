@@ -17,7 +17,7 @@ var (
 )
 
 func init() {
-	analyseCmd.Flags().BoolVar(&contractTrie, "contractTrie", false, "The trie being queried is the general trie")
+	analyseCmd.Flags().BoolVar(&contractTrie, "contractTrie", false, "The trie being queried is a contract trie")
 	rootCmd.AddCommand(analyseCmd)
 }
 
@@ -45,7 +45,28 @@ func execAnalyse(cmd *cobra.Command, args []string) {
 		fmt.Println(err)
 		return
 	}
+	store.Close()
 
+	DisplayResults(sa, contractTrie)
+	DisplayFolderSizes(dbPath)
+
+}
+
+func DirSize(path string) (int64, error) {
+	var size int64
+	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
+		return err
+	})
+	return size, err
+}
+
+func DisplayResults(sa *stool.StateAnalysis, contractTrie bool) {
 	if contractTrie {
 		fmt.Println("\nContract trie analysis results:")
 		fmt.Println("=================================")
@@ -66,17 +87,19 @@ func execAnalyse(cmd *cobra.Command, args []string) {
 			fmt.Println("Number of DB reads performed to iterate Trie: ", sa.Trie.LoadDbCounter)
 		}
 		fmt.Println("Total Aer Balance of all pubKeys and contracts: ", sa.Counters.TotalAerBalance)
-		store.Close()
 	}
+}
 
+func DisplayFolderSizes(dbPath string) {
+	statePath := path.Join(dbPath, "state")
 	sqlPath := path.Join(dbPath, "statesql")
 	chainPath := path.Join(dbPath, "chain")
 	accPath := path.Join(dbPath, "account")
-	totalSize, err := DirSize(dbPath)
-	stateSize, err := DirSize(statePath)
-	sqlSize, err := DirSize(sqlPath)
-	chainSize, err := DirSize(chainPath)
-	accSize, err := DirSize(accPath)
+	totalSize, _ := DirSize(dbPath)
+	stateSize, _ := DirSize(statePath)
+	sqlSize, _ := DirSize(sqlPath)
+	chainSize, _ := DirSize(chainPath)
+	accSize, _ := DirSize(accPath)
 	fmt.Println("\nOther information:")
 	fmt.Println("==================")
 	fmt.Println("Total blockchain size: ", float64(totalSize)/1024.0/1024.0, " Mb")
@@ -84,18 +107,4 @@ func execAnalyse(cmd *cobra.Command, args []string) {
 	fmt.Println("Chain size: ", float64(chainSize)/1024.0/1024.0, " Mb")
 	fmt.Println("SQL State size: ", float64(sqlSize)/1024.0/1024.0, " Mb")
 	fmt.Println("Account size: ", float64(accSize)/1024.0/1024.0, " Mb")
-}
-
-func DirSize(path string) (int64, error) {
-	var size int64
-	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			size += info.Size()
-		}
-		return err
-	})
-	return size, err
 }
