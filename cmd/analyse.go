@@ -1,25 +1,24 @@
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path"
 
 	"github.com/aergoio/aergo-lib/db"
-	"github.com/aergoio/aergo/types"
 	"github.com/aergoio/state-tools/stool"
-	"github.com/gogo/protobuf/proto"
 	"github.com/mr-tron/base58/base58"
 	"github.com/spf13/cobra"
 )
 
 var (
 	contractTrie bool
+	root         string
 )
 
 func init() {
 	analyseCmd.Flags().BoolVar(&contractTrie, "contractTrie", false, "The trie being queried is a contract trie")
+	analyseCmd.Flags().StringVarP(&root, "root", "r", "", "Root of the Aergo trie to analyse/snapshot")
 	rootCmd.AddCommand(analyseCmd)
 }
 
