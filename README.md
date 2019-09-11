@@ -14,28 +14,47 @@ $ go install
 ## Usage
 
 ```sh
-$ state-tools
+$ state-tools -h       
 
-Welcome to the Aergo state analysis tool:
-===================================
-===================================
+state-tools analyses and creates snapshots of aergo state at a given trie root
+                   When parsing the general trie, accounts are analysed to count all account types and balances.
+                   Snapshots can be created for the whole state and stored in a new database.
+                   Other statistics about blockchain state and chain data size are also provided.
 
-Path/to/aergo/database/data/state:
-> /Users/pa/Go_workspace/src/github.com/aergoio/aergo/.aergo/data/state
+Usage:
+  state-tools [command]
 
-Blocks TrieRoot (b58):
-> 66QMsEUpLc7zx2D4jkYMN5UbGefmdFFHePnXrZitKJc2
+Available Commands:
+  analyse     Analyse the database
+  help        Help about any command
+  snapshot    Create a snapshot of the database
+  version     Print the version number of state-tools
 
-Count DB reads (y/n):
-> y
+Flags:
+  -c, --counterOn       Make a counter of db reads (default true)
+  -p, --dbPath string   Path/to/blockchain/database/folder/data
+  -h, --help            help for state-tools
 
-Analysis results:
+Use "state-tools [command] --help" for more information about a command.
+
+
+$ state-tools analysis -p .aergo/data
+
+General trie analysis results:
+==============================
+* Number of contracts:  14341
+* Number of pubKey accounts + 1 (staking contract):  4325
+* Number of 0 balance pubkeys:  85
+* Total number of accounts (pubkey + contract):  18751
+* Number of nil (0 nonce, 0 balance) objects:  5
+* Number of DB reads performed to iterate Trie:  10459
+* Total Aer Balance of all pubKeys and contracts:  500000000000000000000000000
+
+Size information:
 =================
-Number of contracts:  1
-Number of pubKey accounts:  2
-Total number of accounts (pubkey + contract):  3
-Number of other objects stored in trie:  0
-Number of DB reads performed to iterate Trie:  1
-Total Aer Balance of all pubKeys and contracts:  60000000000000000000000
+* Total blockchain size:  8727.776446342468  Mb
+* State size:  59.62231636047363  Mb
+* Chain size:  7979.934971809387  Mb
+* SQL State size:  688.21875  Mb
 
 ```
