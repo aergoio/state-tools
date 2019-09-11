@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -9,7 +10,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/aergoio/aergo-lib/db"
+	"github.com/aergoio/aergo/types"
 	"github.com/aergoio/state-tools/stool"
+	"github.com/gogo/protobuf/proto"
 )
 
 func isEmpty(name string) bool {
@@ -67,21 +71,43 @@ func displayFolderSizes(dbPath, title string) {
 	statePath := path.Join(dbPath, "state")
 	sqlPath := path.Join(dbPath, "statesql")
 	chainPath := path.Join(dbPath, "chain")
-	accPath := path.Join(dbPath, "account")
 	totalSize, _ := dirSize(dbPath)
 	stateSize, _ := dirSize(statePath)
 	sqlSize, _ := dirSize(sqlPath)
 	chainSize, _ := dirSize(chainPath)
-	accSize, _ := dirSize(accPath)
 	fmt.Printf("\n%s\n", title)
 	fmt.Println(strings.Repeat("=", len(title)))
 	fmt.Println("* Total blockchain size: ", float64(totalSize)/1024.0/1024.0, " Mb")
 	fmt.Println("* State size: ", float64(stateSize)/1024.0/1024.0, " Mb")
 	fmt.Println("* Chain size: ", float64(chainSize)/1024.0/1024.0, " Mb")
 	fmt.Println("* SQL State size: ", float64(sqlSize)/1024.0/1024.0, " Mb")
-	fmt.Println("* Account size: ", float64(accSize)/1024.0/1024.0, " Mb")
 }
 
 func copyDir(sourcePath, destinationPath string) {
 	exec.Command("cp", "-r", sourcePath, destinationPath).Run()
+}
+
+func getLatestTrieRoot(chainPath string) ([]byte, error) {
+	chainStore := db.NewDB(db.BadgerImpl, chainPath)
+	latestKey := []byte("chain.latest")
+	blockIdx := chainStore.Get(latestKey)
+	if blockIdx == nil || len(blockIdx) == 0 {
+		return nil, fmt.Errorf("failed to load latest blockidx")
+	}
+
+	//blockNo := types.BlockNoFromBytes(blockIdx)
+	blockHash := chainStore.Get(blockIdx)
+	blockRaw := chainStore.Get(blockHash)
+	if blockRaw == nil || len(blockRaw) == 0 {
+		return nil, fmt.Errorf("failed to load latest block data")
+	}
+	block := types.Block{}
+	err := proto.Unmarshal(blockRaw, &block)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshall block")
+	}
+	if !bytes.Equal(block.Hash, blockHash) {
+		return nil, fmt.Errorf("loaded block doest't have expected hash")
+	}
+	return block.Header.BlocksRootHash, nil
 }

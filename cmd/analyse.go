@@ -40,41 +40,25 @@ func execAnalyse(cmd *cobra.Command, args []string) {
 
 	// Get state root
 	var rootBytes []byte
+	var err error
 	if len(root) != 0 {
-		rootBytes, _ = base58.Decode(root)
-	} else {
-		// query latest state root in state db
-		chainPath := path.Join(dbPath, "chain")
-		chainStore := db.NewDB(db.BadgerImpl, chainPath)
-		latestKey := []byte("chain.latest")
-		blockIdx := chainStore.Get(latestKey)
-		if blockIdx == nil || len(blockIdx) == 0 {
-			fmt.Println("failed to load latest blockidx")
-			return
-		}
-
-		//blockNo := types.BlockNoFromBytes(blockIdx)
-		blockHash := chainStore.Get(blockIdx)
-		blockRaw := chainStore.Get(blockHash)
-		if blockRaw == nil || len(blockRaw) == 0 {
-			fmt.Println("failed to load latest block data")
-			return
-		}
-		block := types.Block{}
-		err := proto.Unmarshal(blockRaw, &block)
+		rootBytes, err = base58.Decode(root)
 		if err != nil {
-			fmt.Println("failed to unmarshall block")
+			fmt.Println(err)
 			return
 		}
-		if !bytes.Equal(block.Hash, blockHash) {
-			fmt.Println("loaded block doest't have expected hash")
+	} else {
+		// query latest state root in chain db
+		chainPath := path.Join(dbPath, "chain")
+		rootBytes, err = getLatestTrieRoot(chainPath)
+		if err != nil {
+			fmt.Println(err)
 			return
 		}
-		rootBytes = block.Header.BlocksRootHash
 	}
 
 	sa := stool.NewStateAnalysis(store, counterOn, !contractTrie, 10000)
-	err := sa.Analyse(rootBytes)
+	err = sa.Analyse(rootBytes)
 	if err != nil {
 		fmt.Println(err)
 		return
