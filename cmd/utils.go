@@ -43,23 +43,23 @@ func displayResults(sa *stool.StateAnalysis, contractTrie bool) {
 	if contractTrie {
 		fmt.Println("\nContract trie analysis results:")
 		fmt.Println("=================================")
-		fmt.Println("Number of keys in the trie: ", sa.Counters.NbStorageValues)
+		fmt.Println("* Number of keys in the trie: ", sa.Counters.NbStorageValues)
 		if counterOn {
-			fmt.Println("Number of DB reads performed to iterate Trie: ", sa.Trie.LoadDbCounter)
+			fmt.Println("* Number of DB reads performed to iterate Trie: ", sa.Trie.LoadDbCounter)
 		}
 
 	} else {
 		fmt.Println("\nGeneral trie analysis results:")
 		fmt.Println("==============================")
-		fmt.Println("Number of contracts: ", sa.Counters.NbContracts)
-		fmt.Println("Number of pubKey accounts + 1 (staking contract): ", sa.Counters.NbUserAccounts)
-		fmt.Println("Number of 0 balance pubkeys: ", sa.Counters.NbUserAccounts0)
-		fmt.Println("Total number of accounts (pubkey + contract): ", sa.Counters.NbUserAccounts0+sa.Counters.NbUserAccounts+sa.Counters.NbContracts)
-		fmt.Println("Number of nil (0 nonce, 0 balance) objects: ", sa.Counters.NbNilObjects)
+		fmt.Println("* Number of contracts: ", sa.Counters.NbContracts)
+		fmt.Println("* Number of pubKey accounts + 1 (staking contract): ", sa.Counters.NbUserAccounts)
+		fmt.Println("* Number of 0 balance pubkeys: ", sa.Counters.NbUserAccounts0)
+		fmt.Println("* Total number of accounts (pubkey + contract): ", sa.Counters.NbUserAccounts0+sa.Counters.NbUserAccounts+sa.Counters.NbContracts)
+		fmt.Println("* Number of nil (0 nonce, 0 balance) objects: ", sa.Counters.NbNilObjects)
 		if counterOn {
-			fmt.Println("Number of DB reads performed to iterate Trie: ", sa.Trie.LoadDbCounter)
+			fmt.Println("* Number of DB reads performed to iterate Trie: ", sa.Trie.LoadDbCounter)
 		}
-		fmt.Println("Total Aer Balance of all pubKeys and contracts: ", sa.Counters.TotalAerBalance)
+		fmt.Println("* Total Aer Balance of all pubKeys and contracts: ", sa.Counters.TotalAerBalance)
 	}
 }
 
@@ -75,11 +75,11 @@ func displayFolderSizes(dbPath, title string) {
 	accSize, _ := dirSize(accPath)
 	fmt.Printf("\n%s\n", title)
 	fmt.Println(strings.Repeat("=", len(title)))
-	fmt.Println("Total blockchain size: ", float64(totalSize)/1024.0/1024.0, " Mb")
-	fmt.Println("State size: ", float64(stateSize)/1024.0/1024.0, " Mb")
-	fmt.Println("Chain size: ", float64(chainSize)/1024.0/1024.0, " Mb")
-	fmt.Println("SQL State size: ", float64(sqlSize)/1024.0/1024.0, " Mb")
-	fmt.Println("Account size: ", float64(accSize)/1024.0/1024.0, " Mb")
+	fmt.Println("* Total blockchain size: ", float64(totalSize)/1024.0/1024.0, " Mb")
+	fmt.Println("* State size: ", float64(stateSize)/1024.0/1024.0, " Mb")
+	fmt.Println("* Chain size: ", float64(chainSize)/1024.0/1024.0, " Mb")
+	fmt.Println("* SQL State size: ", float64(sqlSize)/1024.0/1024.0, " Mb")
+	fmt.Println("* Account size: ", float64(accSize)/1024.0/1024.0, " Mb")
 }
 
 func copyDir(sourcePath, destinationPath string) {

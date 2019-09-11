@@ -26,7 +26,6 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&root, "root", "r", "", "Root of the Aergo trie to analyse/snapshot")
 	rootCmd.PersistentFlags().StringVarP(&dbPath, "dbPath", "p", "", "Path/to/blockchain/database/folder/data")
 	rootCmd.PersistentFlags().BoolVarP(&counterOn, "counterOn", "c", true, "Make a counter of db reads")
-	rootCmd.MarkPersistentFlagRequired("root")
 	rootCmd.MarkPersistentFlagRequired("dbPath")
 }
 
