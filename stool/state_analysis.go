@@ -119,18 +119,28 @@ func (sa *StateAnalysis) dfs(root []byte, iBatch, height int, batch [][]byte, ch
 		raw := sa.Trie.db.Get(rnode[:HashLength])
 		if sa.generalTrie {
 			// always parse account in general trie
-			storageRoot, err := sa.parseAccount(raw)
+			storageRoot, codeHash, err := sa.parseAccount(raw)
 			if err != nil {
 				ch <- err
 				return
 			}
-			// if snapshot and is contract account, parse contract storage
-			if sa.snapshot && storageRoot != nil {
-				// snapshot contract storage nodes
-				err := sa.snapshotContractState(storageRoot)
-				if err != nil {
-					ch <- err
-					return
+
+			if sa.snapshot {
+				if storageRoot != nil {
+					// snapshot contract storage nodes
+					err := sa.snapshotContractState(storageRoot)
+					if err != nil {
+						ch <- err
+						return
+					}
+				}
+				if codeHash != nil {
+					code := sa.Trie.db.Get(codeHash)
+					var dbkey Hash
+					copy(dbkey[:], codeHash)
+					sa.snapshotLock.Lock()
+					sa.snapshotNodes[dbkey] = code
+					sa.snapshotLock.Unlock()
 				}
 			}
 		} else {
@@ -193,22 +203,23 @@ func (sa *StateAnalysis) stepRightLeft(lnode, rnode []byte, iBatch, height int, 
 	return nil
 }
 
-func (sa *StateAnalysis) parseAccount(raw []byte) ([]byte, error) {
+func (sa *StateAnalysis) parseAccount(raw []byte) ([]byte, []byte, error) {
 	if len(raw) == 0 {
 		// transaction with amount 0 to a new address creates a balance 0 and nonce 0 account
 		sa.counterLock.Lock()
 		sa.Counters.NbNilObjects++
 		sa.counterLock.Unlock()
-		return nil, nil
+		return nil, nil, nil
 	}
 	data := &types.State{}
 	err := proto.Unmarshal(raw, data)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	sa.counterLock.Lock()
 	storageRoot := data.GetStorageRoot()
-	if storageRoot != nil {
+	codeHash := data.GetCodeHash()
+	if codeHash != nil {
 		sa.Counters.NbContracts++
 	} else if data.GetBalance() != nil {
 		sa.Counters.NbUserAccounts++
@@ -219,7 +230,7 @@ func (sa *StateAnalysis) parseAccount(raw []byte) ([]byte, error) {
 	sa.Counters.TotalAerBalance = new(big.Int).Add(sa.Counters.TotalAerBalance,
 		new(big.Int).SetBytes(data.GetBalance()))
 	sa.counterLock.Unlock()
-	return storageRoot, nil
+	return storageRoot, codeHash, nil
 }
 
 func (sa *StateAnalysis) snapshotContractState(storageRoot []byte) error {

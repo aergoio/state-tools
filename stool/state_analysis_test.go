@@ -40,7 +40,7 @@ func Test2AccountsAnalysis(t *testing.T) {
 	balance, _ := new(big.Int).SetString("18446744073709551616", 10)
 	accountData0 := types.State{
 		Balance:     balance.Bytes(),
-		StorageRoot: []byte("storage root"),
+		CodeHash: []byte("code hash"),
 	}
 	accountData1 := types.State{
 		Balance: balance.Bytes(),
@@ -90,7 +90,7 @@ func TestAccountsAnalysisFullLoad(t *testing.T) {
 	balance, _ := new(big.Int).SetString("18446744073709551616", 10)
 	accountData0 := types.State{
 		Balance:     balance.Bytes(),
-		StorageRoot: []byte("storage root"),
+		CodeHash: []byte("code hash"),
 	}
 	accountData1 := types.State{
 		Balance: balance.Bytes(),
