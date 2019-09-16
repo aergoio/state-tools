@@ -36,8 +36,10 @@ Flags:
   -h, --help            help for state-tools
 
 Use "state-tools [command] --help" for more information about a command.
+```
 
-
+### State analysis
+```sh
 $ state-tools analysis -p .aergo/data
 
 General trie analysis results:
@@ -56,5 +58,10 @@ Size information:
 * State size:  59.62231636047363  Mb
 * Chain size:  7979.934971809387  Mb
 * SQL State size:  688.21875  Mb
+```
 
+### State snapshot
+Currently only state trie data is pruned, chain data and sql data are simply copied
+```sh
+$ state-tools snapshot -p .aergo/data -s snapshot/.aergo/data
 ```
