@@ -49,11 +49,13 @@ func execAnalyse(cmd *cobra.Command, args []string) {
 	} else {
 		// query latest state root in chain db
 		chainPath := path.Join(dbPath, "chain")
-		rootBytes, err = getLatestTrieRoot(chainPath)
+		chainStore := db.NewDB(db.BadgerImpl, chainPath)
+		rootBytes, err = getLatestTrieRoot(chainStore)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
+		chainStore.Close()
 	}
 
 	sa := stool.NewStateAnalysis(store, counterOn, !contractTrie, 10000)

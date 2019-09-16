@@ -87,14 +87,17 @@ func copyDir(sourcePath, destinationPath string) {
 	exec.Command("cp", "-r", sourcePath, destinationPath).Run()
 }
 
-func getLatestTrieRoot(chainPath string) ([]byte, error) {
-	chainStore := db.NewDB(db.BadgerImpl, chainPath)
+func getLatestTrieRoot(chainStore db.DB) ([]byte, error) {
 	latestKey := []byte("chain.latest")
 	blockIdx := chainStore.Get(latestKey)
 	if blockIdx == nil || len(blockIdx) == 0 {
 		return nil, fmt.Errorf("failed to load latest blockidx")
 	}
+	return getTrieRoot(chainStore, blockIdx)
 
+}
+
+func getTrieRoot(chainStore db.DB, blockIdx []byte) ([]byte, error) {
 	//blockNo := types.BlockNoFromBytes(blockIdx)
 	blockHash := chainStore.Get(blockIdx)
 	blockRaw := chainStore.Get(blockHash)
@@ -110,4 +113,27 @@ func getLatestTrieRoot(chainPath string) ([]byte, error) {
 		return nil, fmt.Errorf("loaded block doest't have expected hash")
 	}
 	return block.Header.BlocksRootHash, nil
+}
+
+func getVoteTrieRoots(chainStore db.DB) ([]byte, []byte, error) {
+	latestKey := []byte("chain.latest")
+	blockIdx := chainStore.Get(latestKey)
+	if blockIdx == nil || len(blockIdx) == 0 {
+		return nil, nil, fmt.Errorf("failed to load latest blockidx")
+	}
+	blockNo := types.BlockNoFromBytes(blockIdx)
+	q := blockNo / 100
+	voteBlockNo1 := (q - 1) * 100
+	voteBlockNo2 := q * 100
+	voteBlockIdx1 := types.BlockNoToBytes(voteBlockNo1)
+	voteBlockIdx2 := types.BlockNoToBytes(voteBlockNo2)
+	root1, err := getTrieRoot(chainStore, voteBlockIdx1)
+	if err != nil {
+		return nil, nil, err
+	}
+	root2, err := getTrieRoot(chainStore, voteBlockIdx2)
+	if err != nil {
+		return nil, nil, err
+	}
+	return root1, root2, nil
 }

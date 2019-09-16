@@ -49,8 +49,16 @@ func execSnapshot(cmd *cobra.Command, args []string) {
 	snapshotChainPath := path.Join(snapshotPath, "chain")
 	snapshotSqlPath := path.Join(snapshotPath, "statesql")
 
+	chainStore := db.NewDB(db.BadgerImpl, chainPath)
 	// query latest state root in chain db
-	rootBytes, err := getLatestTrieRoot(chainPath)
+	lastRootBytes, err := getLatestTrieRoot(chainStore)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	// query last vote root trie root
+	// it is necessary to snapshot that trie because the dpos will query votes there
+	voteRootBytes1, voteRootBytes2, err := getVoteTrieRoots(chainStore)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -65,10 +73,24 @@ func execSnapshot(cmd *cobra.Command, args []string) {
 	store := db.NewDB(db.BadgerImpl, statePath)
 	snapshotStore := db.NewDB(db.BadgerImpl, snapshotStatePath)
 
-	sa := stool.NewStateAnalysis(store, counterOn, !contractTrie, 10000)
+	// snapshot last state
 	fmt.Println("Iterating the Aergo state trie to create snapshot...")
 	start := time.Now()
-	err = sa.Snapshot(snapshotStore, rootBytes)
+	sa := stool.NewStateAnalysis(store, counterOn, true, 10000)
+	err = sa.Snapshot(snapshotStore, lastRootBytes)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	// snapshot last vote states
+	sva := stool.NewStateAnalysis(store, counterOn, true, 10000)
+	err = sva.Snapshot(snapshotStore, voteRootBytes1)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	sva = stool.NewStateAnalysis(store, counterOn, true, 10000)
+	err = sva.Snapshot(snapshotStore, voteRootBytes2)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -77,6 +99,7 @@ func execSnapshot(cmd *cobra.Command, args []string) {
 
 	store.Close()
 	snapshotStore.Close()
+	chainStore.Close()
 
 	// copy other state data (not pruned)
 	fmt.Println("Copying the rest of the chain data (chain, statesql)...")
