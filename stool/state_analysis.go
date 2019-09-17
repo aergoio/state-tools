@@ -50,12 +50,28 @@ type StateAnalysis struct {
 
 // Counters groups counters together
 type Counters struct {
-	NbUserAccounts  uint
+	// -------------- General trie counters only -----------------------------
+	// Number of pubkey accounts
+	NbUserAccounts uint
+	// Number of pubkey accounts with 0 balance
 	NbUserAccounts0 uint
-	NbContracts     uint
-	NbNilObjects    uint
-	NbStorageValues uint
+	// Number of contract accounts
+	NbContracts uint
+	// Number of nil objects
+	// transaction with amount 0 to a new address creates a balance 0 and nonce 0 account
+	NbNilObjects uint
+	// Total Aer balace held by accounts (pubkey and contract)
 	TotalAerBalance *big.Int
+
+	// -------------- General trie and Contract trie counters ----------------
+	// cumulated height (used for calulating avg depth)
+	CumulatedHeight int
+	AverageDepth    float64
+	DeepestLeaf     int
+
+	// -------------- Contract trie counters only ----------------------------
+	// Number of storage values (leaves) in the contract trie
+	NbStorageValues uint
 }
 
 // NewStateAnalysis initialises StateAnalysis
@@ -66,6 +82,9 @@ func NewStateAnalysis(store db.DB, countDbReads, generalTrie bool, maxThread uin
 		NbContracts:     0,
 		NbNilObjects:    0,
 		NbStorageValues: 0,
+		CumulatedHeight: 0,
+		AverageDepth:    0,
+		DeepestLeaf:     256,
 		TotalAerBalance: new(big.Int).SetUint64(0),
 	}
 	return &StateAnalysis{
@@ -106,6 +125,13 @@ func (sa *StateAnalysis) Dfs(root []byte) error {
 	ch := make(chan error, 1)
 	sa.dfs(root, 0, 256, nil, ch)
 	err := <-ch
+	sa.Counters.DeepestLeaf = 256 - sa.Counters.DeepestLeaf
+	if sa.generalTrie {
+		totalLeaves := float64(sa.Counters.NbUserAccounts + sa.Counters.NbUserAccounts0 + sa.Counters.NbContracts + sa.Counters.NbNilObjects)
+		sa.Counters.AverageDepth = 256.0 - (float64(sa.Counters.CumulatedHeight) / totalLeaves)
+	} else {
+		sa.Counters.AverageDepth = 256.0 - (float64(sa.Counters.CumulatedHeight) / float64(sa.Counters.NbStorageValues))
+	}
 	return err
 }
 
@@ -116,6 +142,12 @@ func (sa *StateAnalysis) dfs(root []byte, iBatch, height int, batch [][]byte, ch
 		return
 	}
 	if isShortcut {
+		sa.counterLock.Lock()
+		sa.Counters.CumulatedHeight += height
+		if sa.Counters.DeepestLeaf > height {
+			sa.Counters.DeepestLeaf = height
+		}
+		sa.counterLock.Unlock()
 		raw := sa.Trie.db.Get(rnode[:HashLength])
 		if sa.generalTrie {
 			// always parse account in general trie

@@ -48,9 +48,6 @@ func displayResults(sa *stool.StateAnalysis, contractTrie bool) {
 		fmt.Println("\nContract trie analysis results:")
 		fmt.Println("=================================")
 		fmt.Println("* Number of keys in the trie: ", sa.Counters.NbStorageValues)
-		if counterOn {
-			fmt.Println("* Number of DB reads performed to iterate Trie: ", sa.Trie.LoadDbCounter)
-		}
 
 	} else {
 		fmt.Println("\nGeneral trie analysis results:")
@@ -60,10 +57,12 @@ func displayResults(sa *stool.StateAnalysis, contractTrie bool) {
 		fmt.Println("* Number of 0 balance pubkeys: ", sa.Counters.NbUserAccounts0)
 		fmt.Println("* Total number of accounts (pubkey + contract): ", sa.Counters.NbUserAccounts0+sa.Counters.NbUserAccounts+sa.Counters.NbContracts)
 		fmt.Println("* Number of nil (0 nonce, 0 balance) objects: ", sa.Counters.NbNilObjects)
-		if counterOn {
-			fmt.Println("* Number of DB reads performed to iterate Trie: ", sa.Trie.LoadDbCounter)
-		}
 		fmt.Println("* Total Aer Balance of all pubKeys and contracts: ", sa.Counters.TotalAerBalance)
+	}
+	fmt.Printf("* Average trie depth: %.2f\n", sa.Counters.AverageDepth)
+	fmt.Println("* Deepest leaf in the trie: ", sa.Counters.DeepestLeaf)
+	if counterOn {
+		fmt.Println("* Number of DB reads performed to iterate Trie: ", sa.Trie.LoadDbCounter)
 	}
 }
 
