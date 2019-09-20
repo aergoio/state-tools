@@ -79,7 +79,7 @@ func execAnalyse(cmd *cobra.Command, args []string) {
 	chainStore.Close()
 
 	fmt.Println("\nAnalysing state with root: ", base58.Encode(rootBytes))
-	sa := stool.NewStateAnalysis(store, counterOn, !contractTrie, true, 10000)
+	sa := stool.NewStateAnalysis(store, countDBReads, !contractTrie, integrityCheck, 10000)
 	err = sa.Analyse(rootBytes)
 	if err != nil {
 		fmt.Println(err)

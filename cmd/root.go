@@ -8,8 +8,9 @@ import (
 )
 
 var (
-	dbPath    string
-	counterOn bool
+	dbPath         string
+	countDBReads   bool
+	integrityCheck bool
 )
 
 var rootCmd = &cobra.Command{
@@ -23,7 +24,8 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&dbPath, "dbPath", "p", "", "Path/to/blockchain/database/folder/data")
-	rootCmd.PersistentFlags().BoolVarP(&counterOn, "counterOn", "c", true, "Make a counter of db reads")
+	rootCmd.PersistentFlags().BoolVarP(&countDBReads, "countDBReads", "c", true, "Make a counter of db reads")
+	rootCmd.PersistentFlags().BoolVarP(&integrityCheck, "integrityCheck", "i", true, "Hash trie nodes to check integrity")
 	rootCmd.MarkPersistentFlagRequired("dbPath")
 }
 

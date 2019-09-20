@@ -61,7 +61,7 @@ func displayResults(sa *stool.StateAnalysis, contractTrie bool) {
 	}
 	fmt.Printf("* Average trie depth: %.2f\n", sa.Counters.AverageDepth)
 	fmt.Println("* Deepest leaf in the trie: ", sa.Counters.DeepestLeaf)
-	if counterOn {
+	if countDBReads {
 		fmt.Println("* Number of DB reads performed to iterate Trie: ", sa.Trie.LoadDbCounter)
 	}
 }

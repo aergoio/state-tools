@@ -77,7 +77,7 @@ func execSnapshot(cmd *cobra.Command, args []string) {
 	// snapshot last state
 	fmt.Println("Iterating the Aergo state trie to create snapshot...")
 	start := time.Now()
-	sa := stool.NewStateAnalysis(store, counterOn, true, false, 10000)
+	sa := stool.NewStateAnalysis(store, countDBReads, true, integrityCheck, 10000)
 	err = sa.Snapshot(snapshotStore, lastRootBytes)
 	if err != nil {
 		fmt.Println(err)
@@ -87,13 +87,13 @@ func execSnapshot(cmd *cobra.Command, args []string) {
 	hasher := sha256.New()
 	hasher.Write([]byte("aergo.system"))
 	votingContract := hasher.Sum(nil)
-	sva := stool.NewStateAnalysis(store, false, true, false, 10000)
+	sva := stool.NewStateAnalysis(store, false, true, integrityCheck, 10000)
 	err = sva.SnapshotAccount(snapshotStore, voteRootBytes1, votingContract)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	sva = stool.NewStateAnalysis(store, false, true, false, 10000)
+	sva = stool.NewStateAnalysis(store, false, true, integrityCheck, 10000)
 	err = sva.SnapshotAccount(snapshotStore, voteRootBytes2, votingContract)
 	if err != nil {
 		fmt.Println(err)
