@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"time"
 
 	"github.com/aergoio/aergo-lib/db"
 	"github.com/aergoio/aergo/types"
@@ -27,7 +28,7 @@ func init() {
 
 var analyseCmd = &cobra.Command{
 	Use:   "analyse",
-	Short: "Analyse the database",
+	Short: "Analyse the leaves of a trie",
 	Run:   execAnalyse,
 }
 
@@ -79,11 +80,16 @@ func execAnalyse(cmd *cobra.Command, args []string) {
 	chainStore.Close()
 
 	fmt.Println("\nAnalysing state with root: ", base58.Encode(rootBytes))
+	start := time.Now()
 	sa := stool.NewStateAnalysis(store, countDBReads, !contractTrie, integrityCheck, 10000)
 	err = sa.Analyse(rootBytes)
 	if err != nil {
 		fmt.Println(err)
 		return
+	}
+	fmt.Printf("Time to analyse: %v\n", time.Since(start))
+	if integrityCheck {
+		fmt.Println("Integrity check: pass")
 	}
 	store.Close()
 

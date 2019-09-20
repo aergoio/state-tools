@@ -180,75 +180,7 @@ func (sa *StateAnalysis) dfs(root []byte, iBatch, height int, batch [][]byte, ch
 		return
 	}
 	if isShortcut {
-		if sa.integrityCheck {
-			if !bytes.Equal(root[:HashLength], Hasher(lnode[:HashLength], rnode[:HashLength], []byte{byte(height)})) {
-				ch <- fmt.Errorf("Warning: state integrity failed")
-				return
-			}
-		}
-		sa.counterLock.Lock()
-		sa.Counters.CumulatedHeight += height
-		if sa.Counters.DeepestLeaf > height {
-			sa.Counters.DeepestLeaf = height
-		}
-		sa.counterLock.Unlock()
-		raw := sa.Trie.db.Get(rnode[:HashLength])
-		if sa.generalTrie {
-			// always parse account in general trie
-			storageRoot, codeHash, err := sa.parseAccount(raw)
-			if err != nil {
-				ch <- err
-				return
-			}
-			if sa.snapshot {
-				// snapshot always requires copying contract state
-				if sa.accountKey != nil && !bytes.Equal(sa.accountKey, lnode[:HashLength]) {
-					// if snapshot of a single account (aergo.system) then it should match leaf
-					ch <- fmt.Errorf("lnode doesnt match requested account key snapshot")
-					return
-				}
-				if storageRoot != nil {
-					// snapshot contract storage nodes
-					err := sa.snapshotContractState(storageRoot)
-					if err != nil {
-						ch <- err
-						return
-					}
-				}
-				if codeHash != nil {
-					code := sa.Trie.db.Get(codeHash)
-					var dbkey Hash
-					copy(dbkey[:], codeHash)
-					sa.snapshotLock.Lock()
-					sa.snapshotNodes[dbkey] = code
-					sa.snapshotLock.Unlock()
-				}
-			} else if sa.integrityCheck && storageRoot != nil {
-				// contracts only need to be analysed when doing integrity check
-				err := sa.analyseContractState(storageRoot)
-				if err != nil {
-					ch <- err
-					return
-				}
-			} else {
-				// do nothing, only analysing the General trie
-			}
-		} else {
-			// storage values cannot be parsed so just count them
-			sa.counterLock.Lock()
-			sa.Counters.NbStorageValues++
-			sa.counterLock.Unlock()
-		}
-		if sa.snapshot {
-			// snapshot shortcut node
-			// fmt.Println("height: ", height)
-			var dbkey Hash
-			copy(dbkey[:], rnode[:HashLength])
-			sa.snapshotLock.Lock()
-			sa.snapshotNodes[dbkey] = raw
-			sa.snapshotLock.Unlock()
-		}
-		ch <- nil
+		ch <- sa.processShortcut(root, lnode, rnode, height)
 		return
 	} else if sa.integrityCheck {
 		// if not leaf node and check integrity, then hash nodes to perform check
@@ -267,6 +199,7 @@ func (sa *StateAnalysis) dfs(root []byte, iBatch, height int, batch [][]byte, ch
 			return
 		}
 	}
+	// step to next node
 	if sa.generalTrie && sa.accountKey != nil {
 		// snapshot single account path in general trie
 		if bitIsSet(sa.accountKey, 256-height) {
@@ -288,6 +221,72 @@ func (sa *StateAnalysis) dfs(root []byte, iBatch, height int, batch [][]byte, ch
 		err = sa.stepRightLeft(lnode, rnode, iBatch, height, batch)
 		ch <- err
 	}
+}
+
+func (sa *StateAnalysis) processShortcut(root, lnode, rnode []byte, height int) error {
+	if sa.integrityCheck {
+		if !bytes.Equal(root[:HashLength], Hasher(lnode[:HashLength], rnode[:HashLength], []byte{byte(height)})) {
+			return fmt.Errorf("Warning: state integrity failed")
+		}
+	}
+	sa.counterLock.Lock()
+	sa.Counters.CumulatedHeight += height
+	if sa.Counters.DeepestLeaf > height {
+		sa.Counters.DeepestLeaf = height
+	}
+	sa.counterLock.Unlock()
+	raw := sa.Trie.db.Get(rnode[:HashLength])
+	if sa.generalTrie {
+		// always parse account in general trie
+		storageRoot, codeHash, err := sa.parseAccount(raw)
+		if err != nil {
+			return err
+		}
+		if sa.snapshot {
+			// snapshot always requires copying contract state
+			if sa.accountKey != nil && !bytes.Equal(sa.accountKey, lnode[:HashLength]) {
+				// if snapshot of a single account (aergo.system) then it should match leaf
+				return fmt.Errorf("lnode doesnt match requested account key snapshot")
+			}
+			if storageRoot != nil {
+				// snapshot contract storage nodes
+				err := sa.snapshotContractState(storageRoot)
+				if err != nil {
+					return err
+				}
+			}
+			if codeHash != nil {
+				code := sa.Trie.db.Get(codeHash)
+				var dbkey Hash
+				copy(dbkey[:], codeHash)
+				sa.snapshotLock.Lock()
+				sa.snapshotNodes[dbkey] = code
+				sa.snapshotLock.Unlock()
+			}
+		} else if sa.integrityCheck && storageRoot != nil {
+			// contracts only need to be analysed when doing integrity check
+			err := sa.analyseContractState(storageRoot)
+			if err != nil {
+				return err
+			}
+		} else {
+			// do nothing, only analysing the General trie
+		}
+	} else {
+		// storage values cannot be parsed so just count them
+		sa.counterLock.Lock()
+		sa.Counters.NbStorageValues++
+		sa.counterLock.Unlock()
+	}
+	if sa.snapshot {
+		// snapshot shortcut node
+		var dbkey Hash
+		copy(dbkey[:], rnode[:HashLength])
+		sa.snapshotLock.Lock()
+		sa.snapshotNodes[dbkey] = raw
+		sa.snapshotLock.Unlock()
+	}
+	return nil
 }
 
 func (sa *StateAnalysis) stepRightLeft(lnode, rnode []byte, iBatch, height int, batch [][]byte) error {

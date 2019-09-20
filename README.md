@@ -17,27 +17,28 @@ $ go install
 ```sh
 $ state-tools -h       
 
-state-tools analyses and creates snapshots of aergo state at a given trie root
-                   When parsing the general trie, accounts are analysed to count all account types and balances.
-                   Snapshots can be created for the whole state and stored in a new database.
-                   Other statistics about blockchain state and chain data size are also provided.
+state-tools parses every trie node and leaf in the Aergo trie of given root. 
+        Functionlity : 
+        - Analyse without state integrity: gets information about trie leaves
+        - Analyse with state integrity: gets information about trie leaves and also analyses contract storage tries for integrity.
+        - Snapshot state (copies the general and contract tries)
 
 Usage:
   state-tools [command]
 
 Available Commands:
-  analyse     Analyse the database
+  analyse     Analyse the leaves of a trie
   help        Help about any command
   snapshot    Create a snapshot of the database
   version     Print the version number of state-tools
 
 Flags:
-  -c, --counterOn       Make a counter of db reads (default true)
-  -p, --dbPath string   Path/to/blockchain/database/folder/data
-  -h, --help            help for state-tools
+  -c, --countDBReads     Make a counter of db reads (default true)
+  -p, --dbPath string    Path/to/blockchain/database/folder/data
+  -h, --help             help for state-tools
+  -i, --integrityCheck   Analyse general and all contract trie nodes to check integrity. (default true)
 
-Use "state-tools [command] --help" for more information about a command.
-```
+Use "state-tools [command] --help" for more information about a command.```
 
 ### State analysis
 #### Default: analyse the latest General trie state
@@ -45,6 +46,8 @@ Use "state-tools [command] --help" for more information about a command.
 $ state-tools analysis -p .aergo/data
 
 Analysing state with root:  9u4XgnVxFw4nmeXqYbs5HGNHGg7YPfgK5JgrVLX2Nrc7
+Time to analyse: 7.069858854s
+Integrity check: pass
 
 General trie analysis results:
 ==============================
@@ -84,6 +87,7 @@ $ state-tools snapshot -p .aergo/data -s snapshot/.aergo/data
 
 Iterating the Aergo state trie to create snapshot...
 Time to create snapshot: 9.477358269s
+Integrity check: pass
 Copying the rest of the chain data (chain, statesql)...
 
 General trie analysis results:

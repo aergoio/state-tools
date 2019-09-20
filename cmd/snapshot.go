@@ -100,6 +100,9 @@ func execSnapshot(cmd *cobra.Command, args []string) {
 		return
 	}
 	fmt.Printf("Time to create snapshot: %v\n", time.Since(start))
+	if integrityCheck {
+		fmt.Println("Integrity check: pass")
+	}
 
 	store.Close()
 	snapshotStore.Close()
