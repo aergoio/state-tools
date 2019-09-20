@@ -8,6 +8,7 @@ import (
 
 	"github.com/aergoio/aergo-lib/db"
 	"github.com/aergoio/state-tools/stool"
+	sha256 "github.com/minio/sha256-simd"
 	"github.com/spf13/cobra"
 )
 
@@ -83,14 +84,17 @@ func execSnapshot(cmd *cobra.Command, args []string) {
 		return
 	}
 	// snapshot last vote states
-	sva := stool.NewStateAnalysis(store, counterOn, true, 10000)
-	err = sva.Snapshot(snapshotStore, voteRootBytes1)
+	hasher := sha256.New()
+	hasher.Write([]byte("aergo.system"))
+	votingContract := hasher.Sum(nil)
+	sva := stool.NewStateAnalysis(store, false, true, 10000)
+	err = sva.SnapshotAccount(snapshotStore, voteRootBytes1, votingContract)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	sva = stool.NewStateAnalysis(store, counterOn, true, 10000)
-	err = sva.Snapshot(snapshotStore, voteRootBytes2)
+	sva = stool.NewStateAnalysis(store, false, true, 10000)
+	err = sva.SnapshotAccount(snapshotStore, voteRootBytes2, votingContract)
 	if err != nil {
 		fmt.Println(err)
 		return

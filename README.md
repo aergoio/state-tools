@@ -83,32 +83,32 @@ Currently only state trie data is pruned, chain data and sql data are simply cop
 $ state-tools snapshot -p .aergo/data -s snapshot/.aergo/data
 
 Iterating the Aergo state trie to create snapshot...
-Time to create snapshot: 30.684162921s
+Time to create snapshot: 9.477358269s
 Copying the rest of the chain data (chain, statesql)...
 
 General trie analysis results:
 ==============================
-* Number of contracts:  14339
+* Number of contracts:  14276
 * Number of pubKey accounts + 1 (staking contract):  4327
 * Number of 0 balance pubkeys:  85
-* Total number of accounts (pubkey + contract):  18751
+* Total number of accounts (pubkey + contract):  18688
 * Number of nil (0 nonce, 0 balance) objects:  5
 * Total Aer Balance of all pubKeys and contracts:  500000000000000000000000000
-* Average trie depth: 15.49
+* Average trie depth: 15.48
 * Deepest leaf in the trie:  32
-* Number of DB reads performed to iterate Trie:  10459
+* Number of DB reads performed to iterate Trie:  10428
 
 Size information BEFORE snapshot:
 =================================
-* Total blockchain size:  9165.879945755005  Mb
-* State size:  431.803409576416  Mb
-* Chain size:  8045.8540391922  Mb
-* SQL State size:  688.21875  Mb
+* Total blockchain size:  8921.005863189697  Mb
+* State size:  397.4595766067505  Mb
+* Chain size:  7837.4362535476685  Mb
+* SQL State size:  686.109375  Mb
 
 Size information AFTER snapshot:
 ================================
-* Total blockchain size:  8821.948850631714  Mb
-* State size:  87.87606143951416  Mb
-* Chain size:  8045.8540391922  Mb
-* SQL State size:  688.21875  Mb
+* Total blockchain size:  8560.56925868988  Mb
+* State size:  37.023630142211914  Mb
+* Chain size:  7837.4362535476685  Mb
+* SQL State size:  686.109375  Mb
 ```

@@ -1,6 +1,8 @@
 package stool
 
 import (
+	"bytes"
+	"fmt"
 	"math/big"
 	"sync"
 
@@ -46,6 +48,9 @@ type StateAnalysis struct {
 	snapStore db.DB
 	// countDbReads
 	countDbReads bool
+	// set accountKey to snapshot a specific account (voting contract)
+	// and the key path nodes in general trie.
+	accountKey []byte
 }
 
 // Counters groups counters together
@@ -103,6 +108,7 @@ func NewStateAnalysis(store db.DB, countDbReads, generalTrie bool, maxThread uin
 func (sa *StateAnalysis) Snapshot(snapStore db.DB, root []byte) error {
 	sa.snapStore = snapStore
 	sa.snapshot = true
+	sa.accountKey = nil
 	err := sa.Dfs(root)
 	if err != nil {
 		return err
@@ -116,6 +122,20 @@ func (sa *StateAnalysis) Snapshot(snapStore db.DB, root []byte) error {
 func (sa *StateAnalysis) Analyse(root []byte) error {
 	sa.snapshot = false
 	return sa.Dfs(root)
+}
+
+// SnapshotAccount uses Dfs to copy account state nodes and key path to a new snapshot db
+func (sa *StateAnalysis) SnapshotAccount(snapStore db.DB, root, trieKey []byte) error {
+	sa.snapStore = snapStore
+	sa.snapshot = true
+	sa.accountKey = trieKey
+	err := sa.Dfs(root)
+	if err != nil {
+		return err
+	}
+	sa.commitSnapshotNodes(sa.snapshotNodes)
+	sa.commitSnapshotNodes(sa.Trie.snapshotNodes)
+	return nil
 }
 
 // Dfs Depth first search all the trie leaves starting from root
@@ -156,8 +176,12 @@ func (sa *StateAnalysis) dfs(root []byte, iBatch, height int, batch [][]byte, ch
 				ch <- err
 				return
 			}
-
 			if sa.snapshot {
+				if sa.accountKey != nil && !bytes.Equal(sa.accountKey, lnode[:HashLength]) {
+					// if snapshot of a single account (aergo.system) then it should match leaf
+					ch <- fmt.Errorf("lnode doesnt match requested account key snapshot")
+					return
+				}
 				if storageRoot != nil {
 					// snapshot contract storage nodes
 					err := sa.snapshotContractState(storageRoot)
@@ -193,14 +217,34 @@ func (sa *StateAnalysis) dfs(root []byte, iBatch, height int, batch [][]byte, ch
 		ch <- nil
 		return
 	}
-	err = sa.stepRightLeft(lnode, rnode, iBatch, height, batch)
-	ch <- err
+
+	if sa.generalTrie && sa.accountKey != nil {
+		// snapshot single account path in general trie
+		if bitIsSet(sa.accountKey, 256-height) {
+			if rnode == nil {
+				ch <- fmt.Errorf("nil node in the path: account not in general trie")
+				return
+			}
+			err := sa.stepRight(rnode, iBatch, height, batch)
+			ch <- err
+		} else {
+			if lnode == nil {
+				ch <- fmt.Errorf("nil node in the path: account not in general trie")
+				return
+			}
+			err := sa.stepLeft(lnode, iBatch, height, batch)
+			ch <- err
+		}
+	} else {
+		err = sa.stepRightLeft(lnode, rnode, iBatch, height, batch)
+		ch <- err
+	}
 }
 
 func (sa *StateAnalysis) stepRightLeft(lnode, rnode []byte, iBatch, height int, batch [][]byte) error {
-	lch := make(chan error, 1)
-	rch := make(chan error, 1)
 	if lnode != nil && rnode != nil {
+		lch := make(chan error, 1)
+		rch := make(chan error, 1)
 		if sa.totalThread < sa.maxThread {
 			go sa.dfs(lnode, 2*iBatch+1, height-1, batch, lch)
 			go sa.dfs(rnode, 2*iBatch+2, height-1, batch, rch)
@@ -220,16 +264,32 @@ func (sa *StateAnalysis) stepRightLeft(lnode, rnode []byte, iBatch, height int, 
 			return rresult
 		}
 	} else if lnode != nil {
-		sa.dfs(lnode, 2*iBatch+1, height-1, batch, lch)
-		lresult := <-lch
-		if lresult != nil {
-			return lresult
-		}
+		return sa.stepLeft(lnode, iBatch, height, batch)
 	} else if rnode != nil {
+		return sa.stepRight(rnode, iBatch, height, batch)
+	}
+	return nil
+}
+
+func (sa *StateAnalysis) stepRight(rnode []byte, iBatch, height int, batch [][]byte) error {
+	rch := make(chan error, 1)
+	if rnode != nil {
 		sa.dfs(rnode, 2*iBatch+2, height-1, batch, rch)
 		rresult := <-rch
 		if rresult != nil {
 			return rresult
+		}
+	}
+	return nil
+}
+
+func (sa *StateAnalysis) stepLeft(lnode []byte, iBatch, height int, batch [][]byte) error {
+	lch := make(chan error, 1)
+	if lnode != nil {
+		sa.dfs(lnode, 2*iBatch+1, height-1, batch, lch)
+		lresult := <-lch
+		if lresult != nil {
+			return lresult
 		}
 	}
 	return nil
