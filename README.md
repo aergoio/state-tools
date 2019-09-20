@@ -3,6 +3,11 @@
 This tool iterates all the leaves in a state Trie stored in the aergo state db.
 It can simply analyse leaves in a state root (general or contract trie) or create a snapshot of the whole database while keeping only the 'latest' state.
 
+Functionality:
+- Analyse with state integrity check: check state integrity (hash trie nodes) of the general trie and all contract tries. Also give information about the general or requested trie leaves.
+- Analyse without integrity check: give information about the general or requested trie leaves (quantities, balances...)
+- Snapshot (with or without integrity check): copies the state belonging to the latest block and the chain data to a new database. Also give information about the general trie.
+
 
 ## Installation
 
@@ -39,6 +44,7 @@ Flags:
   -i, --integrityCheck   Analyse general and all contract trie nodes to check integrity. (default true)
 
 Use "state-tools [command] --help" for more information about a command.```
+```
 
 ### State analysis
 #### Default: analyse the latest General trie state
