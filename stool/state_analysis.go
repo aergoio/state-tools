@@ -2,6 +2,7 @@ package stool
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"math/big"
 	"sync"
@@ -13,6 +14,20 @@ import (
 
 // Hash type of snapshotNodes map keys
 type Hash [32]byte
+
+var (
+	// DefaultLeaf is the root of an empty branch
+	DefaultLeaf = []byte{0}
+)
+
+// Hasher is in aergo/internal so cannot be imported at this time
+var Hasher = func(data ...[]byte) []byte {
+	hasher := sha256.New()
+	for i := 0; i < len(data); i++ {
+		hasher.Write(data[i])
+	}
+	return hasher.Sum(nil)
+}
 
 // DbTx represents Set and Delete interface to store data
 type DbTx interface {
@@ -48,6 +63,8 @@ type StateAnalysis struct {
 	snapStore db.DB
 	// countDbReads
 	countDbReads bool
+	// hash nodes to perform integrity check on state (analyses general trie and contract tries)
+	integrityCheck bool
 	// set accountKey to snapshot a specific account (voting contract)
 	// and the key path nodes in general trie.
 	accountKey []byte
@@ -80,7 +97,7 @@ type Counters struct {
 }
 
 // NewStateAnalysis initialises StateAnalysis
-func NewStateAnalysis(store db.DB, countDbReads, generalTrie bool, maxThread uint) *StateAnalysis {
+func NewStateAnalysis(store db.DB, countDbReads, generalTrie, integrityCheck bool, maxThread uint) *StateAnalysis {
 	c := &Counters{
 		NbUserAccounts:  0,
 		NbUserAccounts0: 0,
@@ -93,14 +110,15 @@ func NewStateAnalysis(store db.DB, countDbReads, generalTrie bool, maxThread uin
 		TotalAerBalance: new(big.Int).SetUint64(0),
 	}
 	return &StateAnalysis{
-		Counters:      c,
-		maxThread:     maxThread,
-		totalThread:   0,
-		snapshotNodes: make(map[Hash][]byte),
-		snapshot:      false,
-		generalTrie:   generalTrie,
-		store:         store,
-		countDbReads:  countDbReads,
+		Counters:       c,
+		maxThread:      maxThread,
+		totalThread:    0,
+		snapshotNodes:  make(map[Hash][]byte),
+		snapshot:       false,
+		generalTrie:    generalTrie,
+		store:          store,
+		countDbReads:   countDbReads,
+		integrityCheck: integrityCheck,
 	}
 }
 
@@ -162,6 +180,12 @@ func (sa *StateAnalysis) dfs(root []byte, iBatch, height int, batch [][]byte, ch
 		return
 	}
 	if isShortcut {
+		if sa.integrityCheck {
+			if !bytes.Equal(root[:HashLength], Hasher(lnode[:HashLength], rnode[:HashLength], []byte{byte(height)})) {
+				ch <- fmt.Errorf("Warning: state integrity failed")
+				return
+			}
+		}
 		sa.counterLock.Lock()
 		sa.Counters.CumulatedHeight += height
 		if sa.Counters.DeepestLeaf > height {
@@ -177,6 +201,7 @@ func (sa *StateAnalysis) dfs(root []byte, iBatch, height int, batch [][]byte, ch
 				return
 			}
 			if sa.snapshot {
+				// snapshot always requires copying contract state
 				if sa.accountKey != nil && !bytes.Equal(sa.accountKey, lnode[:HashLength]) {
 					// if snapshot of a single account (aergo.system) then it should match leaf
 					ch <- fmt.Errorf("lnode doesnt match requested account key snapshot")
@@ -198,6 +223,15 @@ func (sa *StateAnalysis) dfs(root []byte, iBatch, height int, batch [][]byte, ch
 					sa.snapshotNodes[dbkey] = code
 					sa.snapshotLock.Unlock()
 				}
+			} else if sa.integrityCheck && storageRoot != nil {
+				// contracts only need to be analysed when doing integrity check
+				err := sa.analyseContractState(storageRoot)
+				if err != nil {
+					ch <- err
+					return
+				}
+			} else {
+				// do nothing, only analysing the General trie
 			}
 		} else {
 			// storage values cannot be parsed so just count them
@@ -216,8 +250,23 @@ func (sa *StateAnalysis) dfs(root []byte, iBatch, height int, batch [][]byte, ch
 		}
 		ch <- nil
 		return
+	} else if sa.integrityCheck {
+		// if not leaf node and check integrity, then hash nodes to perform check
+		var h []byte
+		// lnode and rnode cannot be default at the same time
+		if len(lnode) == 0 {
+			h = Hasher(DefaultLeaf, rnode[:HashLength])
+		} else if len(rnode) == 0 {
+			h = Hasher(lnode[:HashLength], DefaultLeaf)
+		} else {
+			h = Hasher(lnode[:HashLength], rnode[:HashLength])
+		}
+		if !bytes.Equal(root[:HashLength], h) {
+			fmt.Println(root, lnode, rnode)
+			ch <- fmt.Errorf("Warning: state integrity failed")
+			return
+		}
 	}
-
 	if sa.generalTrie && sa.accountKey != nil {
 		// snapshot single account path in general trie
 		if bitIsSet(sa.accountKey, 256-height) {
@@ -326,7 +375,8 @@ func (sa *StateAnalysis) parseAccount(raw []byte) ([]byte, []byte, error) {
 }
 
 func (sa *StateAnalysis) snapshotContractState(storageRoot []byte) error {
-	storageAnalysis := NewStateAnalysis(sa.store, false, false, 1000)
+	// TODO count db reads of contracts
+	storageAnalysis := NewStateAnalysis(sa.store, false, false, false, 1000)
 	storageAnalysis.snapStore = sa.snapStore
 	storageAnalysis.snapshot = true
 	err := storageAnalysis.Dfs(storageRoot)
@@ -335,6 +385,17 @@ func (sa *StateAnalysis) snapshotContractState(storageRoot []byte) error {
 	}
 	sa.commitSnapshotNodes(storageAnalysis.snapshotNodes)
 	sa.commitSnapshotNodes(storageAnalysis.Trie.snapshotNodes)
+	return nil
+}
+
+func (sa *StateAnalysis) analyseContractState(storageRoot []byte) error {
+	// TODO count db reads of contracts
+	storageAnalysis := NewStateAnalysis(sa.store, false, false, sa.integrityCheck, 1000)
+	storageAnalysis.snapshot = false
+	err := storageAnalysis.Dfs(storageRoot)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

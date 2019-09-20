@@ -16,7 +16,6 @@ import (
 	"github.com/aergoio/aergo/pkg/trie"
 	"github.com/aergoio/aergo/types"
 	"github.com/golang/protobuf/proto"
-	sha256 "github.com/minio/sha256-simd"
 )
 
 // TestAccountsAnalysis analyses accounts on a simple trie with 2 accounts
@@ -39,7 +38,7 @@ func Test2AccountsAnalysis(t *testing.T) {
 	txn := store.NewTx()
 	balance, _ := new(big.Int).SetString("18446744073709551616", 10)
 	accountData0 := types.State{
-		Balance:     balance.Bytes(),
+		Balance:  balance.Bytes(),
 		CodeHash: []byte("code hash"),
 	}
 	accountData1 := types.State{
@@ -57,7 +56,7 @@ func Test2AccountsAnalysis(t *testing.T) {
 	txn.(db.Transaction).Commit()
 
 	// Analyse state
-	sa := NewStateAnalysis(store, true, true, 10000)
+	sa := NewStateAnalysis(store, true, true, true, 10000)
 	err := sa.Analyse(smt.Root)
 	if err != nil {
 		t.Fatal(err)
@@ -89,7 +88,7 @@ func TestAccountsAnalysisFullLoad(t *testing.T) {
 	smt := trie.NewTrie(nil, Hasher, store)
 	balance, _ := new(big.Int).SetString("18446744073709551616", 10)
 	accountData0 := types.State{
-		Balance:     balance.Bytes(),
+		Balance:  balance.Bytes(),
 		CodeHash: []byte("code hash"),
 	}
 	accountData1 := types.State{
@@ -102,7 +101,7 @@ func TestAccountsAnalysisFullLoad(t *testing.T) {
 	loadTrieAccounts(smt, store, totalAccounts, raw1)
 	fmt.Println(smt.Root)
 
-	sa := NewStateAnalysis(store, false, true, 10000)
+	sa := NewStateAnalysis(store, false, true, true, 10000)
 	start := time.Now()
 	err := sa.Analyse(smt.Root)
 	fmt.Println("Analysis time: ", time.Now().Sub(start))
@@ -176,13 +175,4 @@ func (d DataArray) Swap(i, j int) {
 }
 func (d DataArray) Less(i, j int) bool {
 	return bytes.Compare(d[i], d[j]) == -1
-}
-
-// Hasher is in aergo/internal so cannot be imported at this time
-var Hasher = func(data ...[]byte) []byte {
-	hasher := sha256.New()
-	for i := 0; i < len(data); i++ {
-		hasher.Write(data[i])
-	}
-	return hasher.Sum(nil)
 }
